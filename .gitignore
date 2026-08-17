@@ -1,0 +1,10 @@
+node_modules
+.claude/
+.wrangler
+public/tools/*/bundle.js
+public/assets/ui.js
+*.log
+package-lock.json
+.kilo/
+public/tools-manifest.json
+bun.lock

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Pack Organizer for Minecraft Bedrock. Upload .mcpack, .mcaddon or .mcworld files and organize them into the com.mojang folder structure for Xbox.">
+<meta name="keywords" content="pack organizer, minecraft bedrock, mcpack, mcaddon, mcworld, com.mojang, xbox, bedrock tools">
+<link rel="canonical" href="https://bedrocktools.pages.dev/tools/organizar-packs/">
+<link rel="alternate" hreflang="es" href="https://bedrocktools.pages.dev/tools/organizar-packs/" />
+<link rel="alternate" hreflang="en" href="https://bedrocktools.pages.dev/tools/organizar-packs/" />
+<link rel="alternate" hreflang="x-default" href="https://bedrocktools.pages.dev/tools/organizar-packs/" />
+<meta property="og:type" content="website">
+<meta property="og:title" content="Pack Organizer — Bedrock Tools">
+<meta property="og:description" content="Organize .mcpack, .mcaddon and .mcworld files into the com.mojang folder structure for Xbox.">
+<meta property="og:url" content="https://bedrocktools.pages.dev/tools/organizar-packs/">
+<meta property="og:site_name" content="Bedrock Tools">
+<meta property="og:image" content="https://bedrocktools.pages.dev/assets/favicon.svg">
+<meta property="og:locale" content="es_ES">
+<meta property="og:locale:alternate" content="en_US" />
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pack Organizer — Bedrock Tools">
+<meta name="twitter:description" content="Organize .mcpack, .mcaddon and .mcworld files into the com.mojang folder structure for Xbox.">
+<meta name="twitter:image" content="https://bedrocktools.pages.dev/assets/favicon.svg">
+<title data-i18n="title">Organizador de Packs — Bedrock Tools</title>
+<link rel="icon" type="image/webp" href="/assets/favicon.svg">
+<link rel="apple-touch-icon" href="/assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Pack Organizer",
+  "url": "https://bedrocktools.pages.dev/tools/organizar-packs/",
+  "description": "Organize .mcpack, .mcaddon and .mcworld files into the com.mojang folder structure for Xbox.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Any",
+  "inLanguage": "en",
+  "creator": {
+    "@type": "Organization",
+    "name": "Bedrock Tools"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://bedrocktools.pages.dev/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Pack Organizer",
+      "item": "https://bedrocktools.pages.dev/tools/organizar-packs/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="back-link" href="/">← <span data-i18n="backHome">Back to home</span></a>
+<div class="top-bar">
+<button class="icon-btn lang-toggle" id="langToggle" title="Change language" aria-label="Change language"><span class="noto-color-emoji-regular">🇪🇸</span> <span class="label">ES</span></button>
+<div class="lang-dropdown" id="langDropdown" role="menu"></div>
+<button class="icon-btn theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Toggle theme"><span class="noto-color-emoji-regular">🌙</span></button>
+</div>
+<main>
+<div class="card">
+<h1 data-i18n="heading">Organizador de Packs</h1>
+<p class="subtitle" data-i18n="description">Sube un archivo <strong>.mcpack</strong>, <strong>.mcaddon</strong> o <strong>.mcworld</strong> para organizarlo en la estructura com.mojang para Xbox.</p>
+<form id="uploadForm">
+<div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Upload file">
+<div class="drop-prompt" id="dropPrompt">
+<span class="drop-icon">📦</span>
+<p class="drop-main" data-i18n="dropPrompt"><span class="noto-color-emoji-regular">👋</span> Arrastra tu archivo aquí o <u>haz clic</u> para seleccionar</p>
+<p class="drop-sub" data-i18n="dropSub">Se admite .mcpack, .mcaddon y .mcworld</p>
+</div>
+<div id="fileNameDisplay">
+<span class="noto-color-emoji-regular">📄</span>
+<span id="fileNameText"></span>
+</div>
+<input type="file" id="fileInput" accept=".mcpack,.mcaddon,.mcworld" multiple>
+</div>
+<div style="text-align:center; margin-top:18px;">
+<button type="submit" id="submitBtn" data-i18n="submitBtn">Organizar packs</button>
+</div>
+</form>
+</div>
+<div id="status"></div>
+</main>
+<script type="module">
+import { processFiles } from './bundle.js';
+import { initUi, getLang } from '../../assets/ui.js';
+
+const translations = {
+es: {
+title: "Organizador de Packs — Bedrock Tools",
+heading: "Organizador de Packs",
+description: 'Sube un archivo <strong>.mcpack</strong>, <strong>.mcaddon</strong> o <strong>.mcworld</strong> para organizarlo en la estructura com.mojang para Xbox.',
+dropPrompt: '<span class="noto-color-emoji-regular">👋</span> Arrastra tus archivos aquí o <u>haz clic</u> para seleccionar',
+dropSub: "Se admite .mcpack, .mcaddon y .mcworld",
+submitBtn: "Organizar packs",
+processing: "Organizando",
+successText: '<span class="noto-color-emoji-regular">✅</span> Organización completada. Descarga el archivo:',
+downloadText: '<span class="noto-color-emoji-regular">⬇️</span> Descargar',
+linkNote: "El enlace solo funciona en esta página. Si lo cierras o actualizas, generalo otra vez.",
+selectFile: "Selecciona un archivo",
+unknownError: '<span class="noto-color-emoji-regular">❌</span> Error desconocido',
+changeLanguageTitle: "Cambiar idioma",
+switchToLightTitle: "Cambiar a tema claro",
+switchToDarkTitle: "Cambiar a tema oscuro",
+backHome: "Back to home",
+invalidFile: "Archivo inválido",
+fileTooLarge: "El archivo supera el tamaño máximo permitido (30 MB)",
+processError: "Error al procesar el archivo",
+maxSizeMB: 30
+},
+en: {
+title: "Pack Organizer — Bedrock Tools",
+heading: "Pack Organizer",
+description: 'Upload a <strong>.mcpack</strong>, <strong>.mcaddon</strong>, or <strong>.mcworld</strong> file to organize it into the com.mojang folder structure for Xbox.',
+dropPrompt: '<span class="noto-color-emoji-regular">👋</span> Drag your files here or <u>click</u> to select',
+dropSub: ".mcpack, .mcaddon, and .mcworld supported",
+submitBtn: "Organize packs",
+processing: "Organizing",
+successText: '<span class="noto-color-emoji-regular">✅</span> Organization complete. Download the file:',
+downloadText: '<span class="noto-color-emoji-regular">⬇️</span> Download',
+linkNote: "This link only works on this page. If you close or refresh it, generate it again.",
+selectFile: "Select a file",
+unknownError: '<span class="noto-color-emoji-regular">❌</span> Unknown error',
+changeLanguageTitle: "Change language",
+switchToLightTitle: "Switch to light theme",
+switchToDarkTitle: "Switch to dark theme",
+backHome: "Back to home",
+invalidFile: "Invalid file",
+fileTooLarge: "File exceeds maximum allowed size (30 MB)",
+processError: "Error processing file",
+maxSizeMB: 30
+}
+};
+
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const form = document.getElementById("uploadForm");
+const status = document.getElementById("status");
+const submitBtn = document.getElementById("submitBtn");
+const dropPrompt = document.getElementById("dropPrompt");
+const fileNameDisplay = document.getElementById("fileNameDisplay");
+let currentFiles = [];
+let lastDownload = null;
+
+function renderSuccessCard(lang, url, newName) {
+return '<div class="status-card"><p class="success" style="margin:0 0 10px">' + translations[lang].successText + '</p><a class="download" href="' + url + '" download="' + newName + '">' + translations[lang].downloadText + ' ' + newName + '</a><p class="link-note">' + translations[lang].linkNote + '</p></div>';
+}
+
+function renderErrorCard(lang, message) {
+return '<div class="status-card"><p class="error" style="margin:0">' + (translations[lang].unknownError || translations.en.unknownError) + ': ' + message + '</p></div>';
+}
+
+function updateStatusForLang(lang) {
+if (!status.innerHTML) return;
+const successMatch = status.innerHTML.match(/href="([^"]+)" download="([^"]+)"/);
+if (successMatch) {
+status.innerHTML = renderSuccessCard(lang, successMatch[1], successMatch[2]);
+}
+}
+
+function showSelectedFiles(files) {
+	if (files && files.length > 0) {
+		document.getElementById("fileNameText").textContent = files.map((f) => f.name).join(", ");
+		document.getElementById("fileNameDisplay").style.display = "flex";
+		dropPrompt.style.display = "none";
+	} else {
+		document.getElementById("fileNameDisplay").style.display = "none";
+		dropPrompt.style.display = "";
+	}
+}
+
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+dropZone.addEventListener("drop", (e) => {
+	e.preventDefault();
+	dropZone.classList.remove("dragover");
+	const files = Array.from(e.dataTransfer.files);
+	if (files.length > 0) {
+		currentFiles = files;
+		showSelectedFiles(files);
+	}
+});
+
+fileInput.addEventListener("change", () => {
+	if (fileInput.files.length) {
+		currentFiles = Array.from(fileInput.files);
+		showSelectedFiles(currentFiles);
+	}
+});
+
+form.addEventListener("submit", async (e) => {
+	e.preventDefault();
+	const files = currentFiles || Array.from(fileInput.files);
+	if (!files.length) { alert(translations[getLang()].selectFile); return; }
+
+	submitBtn.disabled = true;
+	dropZone.style.opacity = "0.7";
+	dropZone.style.pointerEvents = "none";
+	const lang = getLang();
+	status.innerHTML = '<div class="status-card"><div class="status-row"><span class="spinner"></span><span style="color:var(--primary);font-weight:600">' + translations[lang].processing + ' ' + files.length + ' archivo(s)…</span></div></div>';
+
+	try {
+		const buffers = await Promise.all(files.map((f) => f.arrayBuffer()));
+		const datas = buffers.map((buf) => new Uint8Array(buf));
+		const result = await processFiles(datas, files.map((f) => f.name));
+		const newName = "packs_organized.zip";
+		const blob = new Blob([result], { type: "application/zip" });
+		const url = URL.createObjectURL(blob);
+		lastDownload = { url, newName };
+		status.innerHTML = renderSuccessCard(lang, url, newName);
+	} catch (err) {
+		lastDownload = null;
+		status.innerHTML = renderErrorCard(lang, err.message);
+	} finally {
+		submitBtn.disabled = false;
+		dropZone.style.opacity = "1";
+		dropZone.style.pointerEvents = "auto";
+	}
+});
+initUi(translations, { onApplyLang: updateStatusForLang });
+</script>
+</body>
+</html>

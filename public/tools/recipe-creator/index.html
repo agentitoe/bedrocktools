@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Crea recetas custom para Minecraft Bedrock Edition y expórtalas como un addon .mcpack. Recetas con forma, sin forma y de horno.">
+<meta name="keywords" content="minecraft, bedrock, recetas, crafting, addon, mcpack, creador de recetas, recipe creator">
+<link rel="canonical" href="https://bedrocktools.pages.dev/tools/recipe-creator/">
+<link rel="alternate" hreflang="es" href="https://bedrocktools.pages.dev/tools/recipe-creator/" />
+<link rel="alternate" hreflang="en" href="https://bedrocktools.pages.dev/tools/recipe-creator/" />
+<link rel="alternate" hreflang="x-default" href="https://bedrocktools.pages.dev/tools/recipe-creator/" />
+<meta property="og:type" content="website">
+<meta property="og:title" content="Creador de Recetas — Bedrock Tools">
+<meta property="og:description" content="Crea recetas custom para Minecraft Bedrock y expórtalas como .mcpack">
+<meta property="og:url" content="https://bedrocktools.pages.dev/tools/recipe-creator/">
+<meta property="og:site_name" content="Bedrock Tools">
+<meta property="og:image" content="https://bedrocktools.pages.dev/assets/favicon.svg">
+<meta property="og:locale" content="es_ES">
+<meta property="og:locale:alternate" content="en_US" />
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Creador de Recetas — Bedrock Tools">
+<meta name="twitter:description" content="Crea recetas custom para Minecraft Bedrock y expórtalas como .mcpack">
+<meta name="twitter:image" content="https://bedrocktools.pages.dev/assets/favicon.svg">
+<title data-i18n="title">Creador de Recetas — Bedrock Tools</title>
+<link rel="icon" type="image/webp" href="/assets/favicon.svg">
+<link rel="apple-touch-icon" href="/assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/styles.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="back-link" href="/">← <span data-i18n="backHome">Volver al inicio</span></a>
+<div class="top-bar">
+<button class="icon-btn lang-toggle" id="langToggle" title="Cambiar idioma" aria-label="Change language"><span class="noto-color-emoji-regular">🇪🇸</span> <span class="label">ES</span></button>
+<div class="lang-dropdown" id="langDropdown" role="menu"></div>
+<button class="icon-btn theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Toggle theme"><span class="noto-color-emoji-regular">🌙</span></button>
+</div>
+<main>
+<div class="tool-container" id="app">
+</div>
+</main>
+<script type="module">
+import { init } from './bundle.js';
+init();
+</script>
+</body>
+</html>

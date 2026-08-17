@@ -1,0 +1,21 @@
+{
+  "name": "bedrocktools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs && node scripts/extract-data.mjs && node scripts/translate-items.mjs",
+    "dev": "npm run build && node scripts/serve.mjs",
+    "deploy": "wrangler pages deploy public"
+  },
+  "dependencies": {
+    "fflate": "^0.8.1",
+    "minecraft-data": "^3.112.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.35.0"
+  }
+}

@@ -1,0 +1,758 @@
+/* ===== Items & Blocks tool styles =====
+   Loaded by public/tools/minecraft-items/index.html. The base theme
+   (CSS variables, top-bar, buttons) lives in public/assets/styles.css. */
+
+body {
+	max-width: 1080px;
+}
+
+.tool-container {
+	max-width: 1000px;
+	margin: 0 auto;
+	padding: 2rem 1rem;
+}
+
+.filter-bar {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 16px;
+	flex-wrap: wrap;
+}
+.filter-btn {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	color: var(--text);
+	padding: 8px 16px;
+	border-radius: 8px;
+	cursor: pointer;
+	font-size: 0.85rem;
+	font-weight: 500;
+	transition: all .15s ease;
+}
+.filter-btn:hover {
+	border-color: var(--primary);
+	background: var(--surface-hover);
+}
+.filter-btn.active {
+	background: var(--primary);
+	border-color: var(--primary);
+	color: white;
+}
+
+.search-container {
+	position: relative;
+	margin-bottom: 16px;
+}
+.search-input {
+	width: 100%;
+	padding: 12px 44px 12px 16px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: var(--surface);
+	color: var(--text);
+	font-size: 1rem;
+	box-shadow: var(--shadow);
+}
+.search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.search-icon {
+	position: absolute;
+	right: 16px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--muted);
+	font-size: 1.2rem;
+}
+
+.stats-bar {
+	margin-bottom: 16px;
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
+.items-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: 12px;
+}
+
+.item-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 12px;
+	cursor: pointer;
+	transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	min-height: 120px;
+	position: relative;
+}
+.item-card:hover {
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-lg);
+	border-color: var(--primary);
+}
+.item-card.block-item {
+	border-color: #8b5cf6;
+}
+.item-card.block-item:hover {
+	border-color: #a855f7;
+}
+.item-card img,
+.item-card canvas {
+	width: 48px;
+	height: 48px;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+	filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+.item-info {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	text-align: center;
+	width: 100%;
+}
+.item-name {
+	font-weight: 600;
+	font-size: 0.85rem;
+	color: var(--text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+.item-id {
+	font-size: 0.7rem;
+	color: var(--muted);
+	font-family: monospace;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+.item-badge {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	font-size: 0.6rem;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-weight: 600;
+}
+.block-badge {
+	background: #8b5cf6;
+	color: white;
+}
+
+.loading, .no-results {
+	grid-column: 1 / -1;
+	text-align: center;
+	padding: 3rem;
+	color: var(--muted);
+}
+
+/* Modal */
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0,0,0,0.6);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 2000;
+	padding: 1rem;
+	backdrop-filter: blur(4px);
+	animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal.recipe-modal {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	max-width: 500px;
+	width: 100%;
+	max-height: 85vh;
+	overflow-y: auto;
+	box-shadow: var(--shadow-lg);
+	animation: slideUp 0.25s ease;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--border);
+}
+.modal-header h3 { margin: 0; font-size: 1.1rem; }
+.modal-close {
+	background: transparent;
+	border: none;
+	color: var(--muted);
+	font-size: 1.5rem;
+	cursor: pointer;
+	padding: 4px 8px;
+	line-height: 1;
+	border-radius: 8px;
+	transition: background .15s ease, color .15s ease;
+}
+.modal-close:hover { background: var(--surface-hover); color: var(--text); }
+
+.modal-body { padding: 20px; }
+
+.recipe-grid {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 16px;
+}
+.recipe-row {
+	display: flex;
+	gap: 4px;
+	justify-content: center;
+}
+.recipe-slot {
+	width: 48px;
+	height: 48px;
+	background: var(--surface-hover);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+}
+.recipe-slot.empty { background: transparent; border-style: dashed; }
+.recipe-slot img,
+.recipe-slot canvas {
+	width: 36px;
+	height: 36px;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+}
+.item-name-tooltip {
+	position: absolute;
+	bottom: calc(100% + 6px);
+	left: 50%;
+	transform: translateX(-50%);
+	background: #1a1a1a;
+	color: #fff;
+	border: 1px solid #000;
+	border-radius: 4px;
+	padding: 4px 8px;
+	font-size: 0.68rem;
+	font-weight: 600;
+	white-space: nowrap;
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transition: opacity .12s ease, visibility .12s ease;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+	z-index: 20;
+}
+.recipe-slot:hover .item-name-tooltip,
+.gui-slot:hover .item-name-tooltip {
+	opacity: 1;
+	visibility: visible;
+}
+
+.recipe-card { margin-bottom: 16px; }
+.recipe-card:last-child { margin-bottom: 0; }
+.recipe-type-label {
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--muted);
+	margin-bottom: 6px;
+}
+.recipe-content {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 12px;
+	background: var(--surface-hover);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+}
+.recipe-arrow {
+	font-size: 1.25rem;
+	color: var(--muted);
+	margin: 0 2px;
+}
+.recipe-meta {
+	width: 100%;
+	font-size: 0.75rem;
+	color: var(--muted);
+	margin-top: 4px;
+}
+.recipe-text-item {
+	font-size: 0.85rem;
+	color: var(--text);
+	padding: 6px 10px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+.recipe-result {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 6px 10px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+}
+.recipe-result img,
+.recipe-result canvas {
+	width: 40px;
+	height: 40px;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+	filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+.result-info { display: flex; flex-direction: column; gap: 2px; }
+.result-name { font-weight: 600; font-size: 0.8rem; }
+.result-count { color: var(--muted); font-size: 0.75rem; }
+
+.recipe-note { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 12px; }
+.no-recipe { text-align: center; color: var(--muted); padding: 1rem; }
+
+/* ===== Minecraft-style recipe GUI ===== */
+.mc-modal {
+	background: linear-gradient(180deg, #d4d4d4 0%, #bcbcbc 100%);
+	color: #2f2f2f;
+	border: 3px solid;
+	border-color: #f7f7f7 #4a4a4a #4a4a4a #f7f7f7;
+	outline: 2px solid #161616;
+	border-radius: 4px;
+	max-width: 600px;
+	width: 100%;
+	max-height: 88vh;
+	overflow-y: auto;
+	box-shadow: 0 28px 70px rgba(0,0,0,0.6);
+	animation: slideUp 0.25s ease;
+}
+.mc-modal .modal-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 16px;
+	background: linear-gradient(180deg, rgba(255,255,255,0.20), rgba(0,0,0,0.05));
+	border-bottom: 2px solid rgba(0,0,0,0.28);
+}
+.mc-modal .header-icon {
+	width: 46px;
+	height: 46px;
+	flex-shrink: 0;
+	display: grid;
+	place-items: center;
+	background: linear-gradient(180deg, #7f7f7f, #8f8f8f);
+	border: 2px solid;
+	border-color: #373737 #ffffff #ffffff #373737;
+	border-radius: 3px;
+}
+.mc-modal .header-icon img,
+.mc-modal .header-icon canvas {
+	width: 36px;
+	height: 36px;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+	filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+}
+.mc-modal .header-titles { flex: 1; min-width: 0; }
+.mc-modal .header-titles h3 {
+	margin: 0;
+	font-size: 1rem;
+	color: #2f2f2f;
+	text-shadow: 1px 1px 0 rgba(255,255,255,0.55);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.mc-modal .header-sub {
+	display: block;
+	margin-top: 3px;
+	font-size: 0.66rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: #5c5c5c;
+}
+.mc-modal .modal-close {
+	background: linear-gradient(180deg, #aaaaaa, #7d7d7d);
+	border: 2px solid;
+	border-color: #ffffff #373737 #373737 #ffffff;
+	color: #fff;
+	font-size: 0.85rem;
+	font-weight: 700;
+	cursor: pointer;
+	width: 30px;
+	height: 30px;
+	flex-shrink: 0;
+	line-height: 1;
+	padding: 0;
+	border-radius: 3px;
+	text-shadow: 1px 1px 0 #373737;
+	transition: filter .1s ease, transform .05s ease;
+}
+.mc-modal .modal-close:hover { filter: brightness(1.14); }
+.mc-modal .modal-close:active { transform: translateY(1px); }
+.mc-modal .modal-body { padding: 16px; }
+
+.recipe-category { margin-bottom: 18px; }
+.recipe-category:last-child { margin-bottom: 0; }
+.recipe-category-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #2f2f2f;
+	text-shadow: 1px 1px 0 rgba(255,255,255,0.5);
+	padding-bottom: 6px;
+	margin-bottom: 10px;
+	border-bottom: 2px solid rgba(0,0,0,0.3);
+}
+.recipe-category-header .cat-icon { font-size: 1rem; line-height: 1; }
+
+.recipe-card { margin-bottom: 12px; }
+.recipe-card:last-child { margin-bottom: 0; }
+.recipe-content {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 10px;
+	flex-wrap: wrap;
+	padding: 12px;
+	background: linear-gradient(180deg, #7f7f7f, #8b8b8b);
+	border: 2px solid;
+	border-color: #373737 #ffffff #ffffff #373737;
+	border-radius: 3px;
+	box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+}
+
+.recipe-slot {
+	width: 48px;
+	height: 48px;
+	background: linear-gradient(180deg, #7f7f7f, #8f8f8f);
+	border: 2px solid;
+	border-color: #373737 #ffffff #ffffff #373737;
+	border-radius: 2px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	box-sizing: border-box;
+	transition: filter .1s ease;
+}
+.recipe-slot:hover { filter: brightness(1.12); }
+.recipe-slot.empty {
+	background: rgba(0,0,0,0.10);
+	border-color: rgba(0,0,0,0.14);
+	box-shadow: inset 0 1px 2px rgba(0,0,0,0.12);
+}
+.recipe-slot.unknown {
+	color: #fff;
+	font-weight: 700;
+	text-shadow: 1px 1px 0 #373737;
+}
+.recipe-slot img, .recipe-slot canvas {
+	width: 34px;
+	height: 34px;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+	filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
+}
+
+.recipe-arrow {
+	width: 26px;
+	height: 18px;
+	flex-shrink: 0;
+	background: linear-gradient(180deg, #dcdcdc, #9c9c9c);
+	clip-path: polygon(0 42%, 55% 42%, 55% 0, 100% 50%, 55% 100%, 55% 58%, 0 58%);
+	filter: drop-shadow(0 0 1px #4f4f4f) drop-shadow(0 1px 0 rgba(255,255,255,0.35));
+}
+
+.recipe-result {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 12px 6px 6px;
+	background: rgba(255,255,255,0.10);
+	border: 2px solid;
+	border-color: #ffffff #373737 #373737 #ffffff;
+	border-radius: 4px;
+}
+.result-icon {
+	position: relative;
+	width: 46px;
+	height: 46px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(180deg, #7f7f7f, #8f8f8f);
+	border: 2px solid;
+	border-color: #373737 #ffffff #ffffff #373737;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+.result-icon img, .result-icon canvas {
+	width: 38px;
+	height: 38px;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+	filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
+}
+.result-count {
+	position: absolute;
+	bottom: -3px;
+	right: -4px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	color: #fff;
+	text-shadow: 1px 1px 0 #3f3f3f;
+	pointer-events: none;
+	line-height: 1;
+}
+.result-info { display: flex; flex-direction: column; gap: 2px; }
+.result-name {
+	font-weight: 700;
+	font-size: 0.8rem;
+	color: #fff;
+	text-shadow: 1px 1px 0 #3f3f3f;
+	max-width: 150px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.recipe-meta {
+	width: 100%;
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	font-size: 0.7rem;
+	font-weight: 600;
+	color: #fff;
+	margin-top: 2px;
+	text-shadow: 1px 1px 0 #3f3f3f;
+}
+
+.brewing-chain { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.brewing-step {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 6px 8px;
+	background: rgba(0,0,0,0.16);
+	border-radius: 3px;
+}
+.brewing-plus { font-weight: 700; color: #fff; text-shadow: 1px 1px 0 #3f3f3f; font-size: 1rem; }
+.brewing-text {
+	font-size: 0.8rem;
+	color: #fff;
+	text-shadow: 1px 1px 0 #3f3f3f;
+	padding: 4px 8px;
+	background: rgba(0,0,0,0.25);
+	border: 1px solid rgba(0,0,0,0.4);
+	border-radius: 2px;
+}
+.brewing-result { font-weight: 700; color: #ffff55; }
+
+/* ===== Vanilla GUI panels (real Minecraft textures) ===== */
+.recipe-gui {
+	--s: 2;
+	position: relative;
+	width: calc(var(--s) * 176px);
+	height: calc(var(--s) * 83px);
+	margin: 0 auto;
+	background-repeat: no-repeat;
+	background-position: 0 0;
+	background-size: calc(var(--s) * 256px) calc(var(--s) * 256px);
+	image-rendering: pixelated;
+	border-bottom: calc(var(--s) * 1px) solid #000;
+	box-shadow: inset 0 calc(var(--s) * -2px) 0 0 #555555;
+}
+.gui-crafting { background-image: url('/textures/gui/container/crafting_table.png'); }
+.gui-furnace { background-image: url('/textures/gui/container/furnace.png'); }
+.gui-blast { background-image: url('/textures/gui/container/blast_furnace.png'); }
+.gui-smoker { background-image: url('/textures/gui/container/smoker.png'); }
+.gui-stonecutter { background-image: url('/textures/gui/container/stonecutter.png'); }
+.gui-smithing { background-image: url('/textures/gui/container/smithing.png'); }
+.gui-brewing { background-image: url('/textures/gui/container/brewing_stand.png'); }
+
+.gui-slot {
+	position: absolute;
+	width: calc(var(--s) * 18px);
+	height: calc(var(--s) * 18px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.gui-slot img,
+.gui-slot canvas {
+	width: calc(var(--s) * 16px);
+	height: calc(var(--s) * 16px);
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+	pointer-events: none;
+}
+.gui-slot.unknown {
+	color: #fff;
+	font-weight: 700;
+	font-size: calc(var(--s) * 7px);
+	text-shadow: 1px 1px 0 #3f3f3f;
+}
+.gui-count {
+	position: absolute;
+	bottom: 0;
+	right: 0;
+	font-size: calc(var(--s) * 5px);
+	font-weight: 700;
+	color: #fff;
+	text-shadow: 1px 1px 0 #3f3f3f;
+	line-height: 1;
+	pointer-events: none;
+}
+
+/* Brewing chain: step number chip + arrow + potion-name labels */
+.brew-step-chip {
+	position: absolute;
+	top: calc(var(--s) * -8px);
+	left: calc(var(--s) * -8px);
+	min-width: calc(var(--s) * 18px);
+	height: calc(var(--s) * 18px);
+	padding: 0 calc(var(--s) * 3px);
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: calc(var(--s) * 9px);
+	font-weight: 700;
+	line-height: 1;
+	color: #fff;
+	background: linear-gradient(180deg, #8f8f8f, #6b6b6b);
+	border: calc(var(--s) * 1px) solid #000;
+	border-radius: 999px;
+	text-shadow: calc(var(--s) * 1px) calc(var(--s) * 1px) 0 #3f3f3f;
+	box-shadow: inset 0 calc(var(--s) * 1px) 0 rgba(255,255,255,0.45), 0 calc(var(--s) * 2px) calc(var(--s) * 4px) rgba(0,0,0,0.3);
+	z-index: 6;
+	pointer-events: none;
+}
+.brew-arrow {
+	position: absolute;
+	width: calc(var(--s) * 18px);
+	height: calc(var(--s) * 18px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: calc(var(--s) * 13px);
+	font-weight: 700;
+	color: #f5f5f5;
+	text-shadow: 1px 1px 0 #3f3f3f, -1px -1px 0 #3f3f3f;
+	pointer-events: none;
+	z-index: 3;
+}
+.gui-label {
+	pointer-events: none;
+	overflow: visible;
+}
+.gui-label-text {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: max-content;
+	max-width: calc(var(--s) * 44px);
+	font-size: calc(var(--s) * 4.5px);
+	font-weight: 700;
+	color: #2f2f2f;
+	text-shadow: 1px 1px 0 rgba(255,255,255,0.6);
+	text-align: center;
+	line-height: 1.1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.gui-meta {
+	margin-top: 8px;
+	text-align: center;
+	font-size: 0.72rem;
+	font-weight: 600;
+	color: #2f2f2f;
+	text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
+}
+
+.mc-modal .no-recipe-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	padding: 24px 8px 12px;
+}
+.mc-modal .no-recipe-icon {
+	width: 78px;
+	height: 78px;
+	display: grid;
+	place-items: center;
+	background: linear-gradient(180deg, #7f7f7f, #8f8f8f);
+	border: 3px solid;
+	border-color: #373737 #ffffff #ffffff #373737;
+	border-radius: 4px;
+	box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+}
+.mc-modal .no-recipe-icon img,
+.mc-modal .no-recipe-icon canvas {
+	width: 56px;
+	height: 56px;
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
+	filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+}
+.mc-modal .no-recipe {
+	margin: 0;
+	max-width: 340px;
+	text-align: center;
+	color: #2f2f2f;
+	font-size: 0.88rem;
+	line-height: 1.55;
+	text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
+}
+
+@media (max-width: 520px) {
+	.tool-container { padding: 1rem; padding-top: 72px; }
+	.top-bar { top: 10px; right: 10px; gap: 8px; }
+	.icon-btn { padding: 7px 9px; }
+	.filter-bar { gap: 6px; }
+	.filter-btn { padding: 6px 12px; font-size: 0.8rem; }
+	.items-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+	.item-card { padding: 10px; min-height: 100px; }
+	.item-card img { width: 40px; height: 40px; }
+	.item-name { font-size: 0.8rem; }
+	.item-id { font-size: 0.65rem; }
+	.mc-modal { max-height: 92vh; }
+	.recipe-slot { width: 40px; height: 40px; }
+	.recipe-slot img, .recipe-slot canvas { width: 30px; height: 30px; }
+	.recipe-gui { --s: 1.4; }
+
+	/* Kept from the original inline styles: mobile modal/result tweaks. */
+	.modal.recipe-modal { margin: 1rem; max-height: 90vh; }
+	.recipe-result img { width: 48px; height: 48px; }
+}
