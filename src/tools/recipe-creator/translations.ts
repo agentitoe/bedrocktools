@@ -63,7 +63,7 @@ export const translations: TranslationTable = {
 		recipeFileNoteJava: "Las recetas se guardan en data/espacio_de_nombres/recipe/ dentro del data pack.",
 		versionLabel: "Versión de Minecraft (data pack)",
 		footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
-		copyright: "Made with ♥️ by AgentitoE"
+		copyright: "Hecho con ♥️ por AgentitoE"
 	},
 	en: {
 		title: "Recipe Creator — Bedrock Tools",
@@ -127,6 +127,6 @@ export const translations: TranslationTable = {
 		recipeFileNoteJava: "Recipes are stored under data/namespace/recipe/ inside the data pack.",
 		versionLabel: "Minecraft version (data pack)",
 		footerTagline: "Free tools for Minecraft, on Java and Bedrock.",
-		copyright: "All rights reserved."
+		copyright: "Made with ♥️ by AgentitoE"
 	}
 };

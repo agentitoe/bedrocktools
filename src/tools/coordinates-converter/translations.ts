@@ -34,7 +34,7 @@ export const translations: TranslationTable = {
 		infoText1: "En Minecraft, cada bloque en el Nether equivale a 8 bloques en el Overworld.",
 		infoText2: "Solo las coordenadas X y Z se convierten; la coordenada Y (altura) permanece igual.",
 		footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
-		copyright: "Made with ♥️ by AgentitoE"
+		copyright: "Hecho con ♥️ por AgentitoE"
 	},
 	en: {
 		title: "Minecraft Coordinates Calculator — Bedrock Tools",
@@ -69,6 +69,6 @@ export const translations: TranslationTable = {
 		infoText1: "In Minecraft, each block in the Nether equals 8 blocks in the Overworld.",
 		infoText2: "Only X and Z coordinates are converted; the Y coordinate (height) stays the same.",
 		footerTagline: "Free tools for Minecraft, on Java and Bedrock.",
-		copyright: "All rights reserved."
+		copyright: "Made with ♥️ by AgentitoE"
 	}
 };
