@@ -28,7 +28,7 @@ const translations = {
 		feature4Title: "Hecho para Xbox",
 		feature4Desc: "Convierte y organiza packs listos para la carpeta com.mojang de Xbox.",
 		footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
-		copyright: "Todos los derechos reservados.",
+		copyright: "Made with ♥️ by AgentitoE",
 		changeLanguageTitle: "Cambiar idioma",
 		switchToLightTitle: "Cambiar a tema claro",
 		switchToDarkTitle: "Cambiar a tema oscuro",

@@ -48,7 +48,7 @@ export const translations: TranslationTable = {
 		itemCount: "items",
 		recipeVariants: "Otras recetas disponibles",
 		footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
-		copyright: "Todos los derechos reservados."
+		copyright: "Made with ♥️ by AgentitoE"
 	},
 	en: {
 		title: "Items & Blocks — Bedrock Tools",
