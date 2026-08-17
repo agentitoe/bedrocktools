@@ -29,7 +29,7 @@ export const LANGUAGES: Language[] = [
 ];
 
 /** Language used when the user's preference isn't available. */
-export const FALLBACK_LANG = 'es';
+export const FALLBACK_LANG = 'en';
 
 export interface I18nDict {
 	changeLanguageTitle: string;
