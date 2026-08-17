@@ -802,6 +802,25 @@ body.home {
 	color: var(--subtle);
 }
 
+.footer-links {
+	margin: 18px 0 0;
+}
+
+.footer-github {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--muted);
+	font-size: 0.82rem;
+	font-weight: 600;
+	text-decoration: none;
+	transition: color .15s ease;
+}
+
+.footer-github:hover {
+	color: var(--primary);
+}
+
 /* ==========================================================================
    Tool pages — shared components
    ========================================================================== */
