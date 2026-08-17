@@ -62,6 +62,8 @@ export const translations: TranslationTable = {
 		identifierHintJava: "El identificador define la carpeta: data/espacio_de_nombres/recipe/nombre.json",
 		recipeFileNoteJava: "Las recetas se guardan en data/espacio_de_nombres/recipe/ dentro del data pack.",
 		versionLabel: "Versión de Minecraft (data pack)",
+		footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
+		copyright: "Todos los derechos reservados."
 	},
 	en: {
 		title: "Recipe Creator — Bedrock Tools",
@@ -124,5 +126,7 @@ export const translations: TranslationTable = {
 		identifierHintJava: "The identifier defines the folder: data/namespace/recipe/name.json",
 		recipeFileNoteJava: "Recipes are stored under data/namespace/recipe/ inside the data pack.",
 		versionLabel: "Minecraft version (data pack)",
+		footerTagline: "Free tools for Minecraft, on Java and Bedrock.",
+		copyright: "All rights reserved."
 	}
 };

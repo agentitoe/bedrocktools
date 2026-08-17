@@ -47,6 +47,8 @@ export const translations: TranslationTable = {
 		noRecipeItem: "Este item no tiene receta de fabricación (se obtiene de otra forma).",
 		itemCount: "items",
 		recipeVariants: "Otras recetas disponibles",
+		footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
+		copyright: "Todos los derechos reservados."
 	},
 	en: {
 		title: "Items & Blocks — Bedrock Tools",
@@ -94,5 +96,7 @@ export const translations: TranslationTable = {
 		noRecipeItem: "This item has no crafting recipe (it is obtained another way).",
 		itemCount: "items",
 		recipeVariants: "Other recipes available",
+		footerTagline: "Free tools for Minecraft, on Java and Bedrock.",
+		copyright: "All rights reserved."
 	}
 };
