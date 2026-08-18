@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs && node scripts/extract-data.mjs && node scripts/translate-items.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test.mjs",
     "dev": "npm run build && node scripts/serve.mjs",
     "deploy": "wrangler pages deploy public"
   },

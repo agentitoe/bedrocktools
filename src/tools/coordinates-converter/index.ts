@@ -7,6 +7,7 @@
 
 import { initUi, getLang } from '../../shared/ui';
 import { translations } from './translations';
+import { convertCoordinates, formatCoord, type Direction } from './convert';
 
 export function init(): void {
 	if (document.readyState === 'loading') {
@@ -44,19 +45,7 @@ function initCalculator(): void {
 		resultDiv.innerHTML = `<div class="result-loading">${t().calculating}...</div>`;
 
 		setTimeout(() => {
-			let resultX: number, resultZ: number;
-			if (direction === 'toNether') {
-				resultX = x / 8;
-				resultZ = z / 8;
-			} else {
-				resultX = x * 8;
-				resultZ = z * 8;
-			}
-
-			const formatCoord = (num: number): number => {
-				if (Number.isInteger(num)) return num;
-				return parseFloat(num.toFixed(3));
-			};
+			const { x: resultX, z: resultZ } = convertCoordinates(x, y, z, direction as Direction);
 
 			const tr = t();
 			const overworldX = direction === 'toNether' ? x : resultX;

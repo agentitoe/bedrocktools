@@ -10,14 +10,15 @@ Thanks for taking an interest. This is a small static site — a set of Minecraf
 
 ## Before opening a PR
 
-There's no test suite, so the gate is a typecheck plus a quick manual check in the browser:
+The gate is a typecheck plus the unit tests, then a quick manual check in the browser:
 
 ```bash
-npx tsc --noEmit
+npm run typecheck
+npm test
 node scripts/build.mjs
 ```
 
-Then actually try the change in the browser — the dev server reads files from disk, so a refresh shows built changes.
+Unit tests live in `tests/` and run with Node's built-in test runner (bundled via esbuild). Add one whenever you change pure logic. `tests/tools.test.ts` is a general test that validates every tool's manifest, page, i18n and entry point automatically — new tools are covered with no extra work. Then actually try the change in the browser — the dev server reads files from disk, so a refresh shows built changes.
 
 ## Conventions
 

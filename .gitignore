@@ -8,3 +8,4 @@ package-lock.json
 .kilo/
 public/tools-manifest.json
 bun.lock
+.test-dist
