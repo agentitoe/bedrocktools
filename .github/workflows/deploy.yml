@@ -35,7 +35,7 @@ jobs:
         run: npm test
 
       - name: Build
-        run: node scripts/build.mjs
+        run: npm run build
 
   deploy:
     name: Deploy
@@ -57,7 +57,7 @@ jobs:
         run: npm install
 
       - name: Build
-        run: node scripts/build.mjs
+        run: npm run build
 
       # Deploys production on main, a preview deployment on any other branch/PR.
       # Requires these repo secrets:
