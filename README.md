@@ -39,6 +39,7 @@
 | 🧱   | Items & Blocks         | `/tools/minecraft-items`       | Java + Bedrock | Every item and block, with crafting recipes and rendered icons.                                  |
 | ⚒️ | Recipe Creator         | `/tools/recipe-creator`        | Java + Bedrock | Writes custom recipes — a `.mcpack` for Bedrock or a Data Pack for Java.                       |
 | 🗺️ | Coordinates Calculator | `/tools/coordinates-converter` | Java + Bedrock | Overworld ↔ Nether coordinates, using the 1:8 rule.                                             |
+| 🎁 | /give Generator        | `/tools/give-creator`        | Java + Bedrock | Builds custom `/give` commands: name, lore, enchantments, attributes, potions and more.             |
 
 It's a purely static site: each tool is just an HTML page plus a small ES module bundle, and all the actual work happens client-side.
 
