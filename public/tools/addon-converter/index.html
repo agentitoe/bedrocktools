@@ -382,11 +382,18 @@
                 dropZone.style.opacity = "0.7";
                 dropZone.style.pointerEvents = "none";
                 const lang = getLang();
+                const escapeHtml = (value) =>
+                    String(value)
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#39;");
                 status.innerHTML =
                     '<div class="status-card"><div class="status-row"><span class="spinner"></span><span style="color:var(--primary);font-weight:600">' +
                     translations[lang].processing +
                     " " +
-                    file.name +
+                    escapeHtml(file.name) +
                     "…</span></div></div>";
 
                 try {
