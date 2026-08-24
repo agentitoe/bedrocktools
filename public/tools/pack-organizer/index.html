@@ -304,13 +304,23 @@
                 );
             }
 
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+            }
+
             function renderErrorCard(lang, message) {
+                const safeMessage = escapeHtml(message);
                 return (
                     '<div class="status-card"><p class="error" style="margin:0">' +
                     (translations[lang].unknownError ||
                         translations.en.unknownError) +
                     ": " +
-                    message +
+                    safeMessage +
                     "</p></div>"
                 );
             }
