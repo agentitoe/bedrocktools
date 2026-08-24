@@ -16,25 +16,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
-      # package-lock.json is git-ignored, so `npm ci` has nothing to lock onto.
       - name: Install dependencies
-        run: npm install
+        run: bun install
 
       - name: Typecheck
-        run: npm run typecheck
+        run: bun run typecheck
 
       - name: Test
-        run: npm test
+        run: bun run test
 
       - name: Build
-        run: npm run build
+        run: bun run build
 
   deploy:
     name: Deploy
@@ -45,18 +42,16 @@ jobs:
       deployments: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm install
+        run: bun install
 
       - name: Build
-        run: npm run build
+        run: bun run build
 
       # Deploys production on main, a preview deployment on any other branch/PR.
       # Requires these repo secrets:
