@@ -10,6 +10,7 @@ import { initUi } from '../../shared/ui';
 import { decodeUtf8Sig, encodeUtf8 } from '../../shared/encoding';
 import { translations } from './translations';
 import { buildTemplate, type TemplateKind } from './templates';
+import { QUICK_TEMPLATES, buildQuickTemplate, type QuickTemplate, docsUrlForPath } from './quick-templates';
 import { loadMonaco, languageForPath, isBinary } from './monaco';
 import {
 	type FileMap,
@@ -242,6 +243,7 @@ function editorShellHtml(): string {
 				<div class="ae-actions">
 					<button type="button" class="btn btn-ghost" id="aeNewFile">${escapeHtml(l.newFile)}</button>
 					<button type="button" class="btn btn-ghost" id="aeNewFolder">${escapeHtml(l.newFolder)}</button>
+					<button type="button" class="btn btn-ghost" id="aeQuickAdd">${escapeHtml(l.quickAdd)}</button>
 					<button type="button" class="btn btn-ghost" id="aeUploadFiles">${escapeHtml(l.uploadFiles)}</button>
 					<button type="button" class="btn btn-primary" id="aeDownload">${escapeHtml(l.download)}</button>
 					<button type="button" class="btn btn-ghost" id="aeStartOver" title="${escapeHtml(l.startOver)}">↺</button>
@@ -332,6 +334,7 @@ function renderFileHead() {
 	}
 	const data = files[openPath];
 	const bin = isBinary(openPath, data);
+	const docsUrl = docsUrlForPath(openPath);
 	el.innerHTML = `
 		<div class="ae-filehead-left">
 			<div class="ae-filehead-path" title="${escapeHtml(openPath)}">${bin ? '🖼️' : '📄'} ${escapeHtml(openPath)}</div>
@@ -342,6 +345,7 @@ function renderFileHead() {
 			${bin ? '' : `<button type="button" class="btn btn-primary ae-save" id="aeSave">${escapeHtml(t().save)}</button>`}
 			<button type="button" class="btn btn-ghost ae-mini-btn" id="aeRename" title="${escapeHtml(t().rename)}">✏️</button>
 			<button type="button" class="btn btn-ghost ae-mini-btn" id="aeDelete" title="${escapeHtml(t().delete)}">🗑️</button>
+			${docsUrl ? `<button type="button" class="btn btn-ghost ae-mini-btn ae-docs-btn" id="aeDocs" title="${escapeHtml(t().docsHelpTitle)}">📖</button>` : ''}
 		</div>
 	`;
 	wireFileHead();
@@ -397,6 +401,7 @@ function wireLanding() {
 function wireEditorShell() {
 	document.getElementById('aeNewFile')?.addEventListener('click', newFile);
 	document.getElementById('aeNewFolder')?.addEventListener('click', newFolder);
+	document.getElementById('aeQuickAdd')?.addEventListener('click', showQuickAdd);
 	document.getElementById('aeUploadFiles')?.addEventListener('click', () => {
 		document.getElementById('aeFileInput')?.click();
 	});
@@ -438,6 +443,12 @@ function wireFileHead() {
 	});
 	document.getElementById('aeDelete')?.addEventListener('click', () => {
 		if (openPath) deleteFile(openPath);
+	});
+	document.getElementById('aeDocs')?.addEventListener('click', () => {
+		if (openPath) {
+			const url = docsUrlForPath(openPath);
+			if (url) window.open(url, '_blank', 'noopener');
+		}
 	});
 }
 
@@ -559,6 +570,135 @@ async function remountEditor() {
 	const text = dirty ? currentText : decodeUtf8Sig(data);
 	currentText = text;
 	await createEditor(mount, openPath, text, token);
+}
+
+// ---- Quick-add modal ----
+
+function showQuickAdd() {
+	const l = t();
+	const categories = [
+		{ key: 'behavior' as const, label: l.quickAddCategoryBP },
+		{ key: 'resource' as const, label: l.quickAddCategoryRP },
+		{ key: 'other' as const, label: l.quickAddCategoryOther },
+	];
+
+	let selected: QuickTemplate | null = null;
+
+	function renderTemplateList(filter: string) {
+		const list = document.getElementById('aeQuickList');
+		if (!list) return;
+		const q = filter.toLowerCase();
+		const filtered = QUICK_TEMPLATES.filter(
+			(t) =>
+				t.label.toLowerCase().includes(q) ||
+				t.description.toLowerCase().includes(q) ||
+				t.filename.toLowerCase().includes(q)
+		);
+
+		if (filtered.length === 0) {
+			list.innerHTML = `<div class="ae-quick-empty">${escapeHtml(l.quickAddNoMatch)}</div>`;
+			return;
+		}
+
+		let html = '';
+		for (const cat of categories) {
+			const items = filtered.filter((t) => t.category === cat.key);
+			if (items.length === 0) continue;
+			html += `<div class="ae-quick-cat">${escapeHtml(cat.label)}</div>`;
+			for (const t of items) {
+				const active = selected === t ? ' ae-quick-selected' : '';
+				html += `
+					<button type="button" class="ae-quick-item${active}" data-ae-tmpl="${QUICK_TEMPLATES.indexOf(t)}">
+						<span class="ae-quick-label">${escapeHtml(t.label)}</span>
+						<span class="ae-quick-desc">${escapeHtml(t.description)}</span>
+						<span class="ae-quick-path">${escapeHtml(t.filename)}</span>
+					</button>`;
+			}
+		}
+		list.innerHTML = html;
+
+		list.querySelectorAll<HTMLElement>('[data-ae-tmpl]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const idx = Number(btn.getAttribute('data-ae-tmpl'));
+				selected = QUICK_TEMPLATES[idx];
+				renderTemplateList(filter);
+			});
+		});
+	}
+
+	const overlay = document.createElement('div');
+	overlay.className = 'ae-modal-overlay';
+	overlay.innerHTML = `
+		<div class="ae-modal ae-quick-modal" role="dialog" aria-modal="true">
+			<div class="ae-modal-title">${escapeHtml(l.quickAddHeading)}</div>
+			<div class="ae-modal-message">${escapeHtml(l.quickAddHint)}</div>
+			<div class="ae-quick-search-wrap">
+				<input type="text" class="text-input ae-quick-search" id="aeQuickSearch" placeholder="${escapeHtml(l.quickAddSearch)}" spellcheck="false" autocomplete="off">
+			</div>
+			<div class="ae-quick-list" id="aeQuickList"></div>
+			<label class="editor-label">${escapeHtml(l.quickAddNameLabel)}</label>
+			<input type="text" class="text-input" id="aeQuickName" value="" placeholder="${escapeHtml(l.quickAddNamePh)}" spellcheck="false" autocomplete="off">
+			<div class="ae-modal-actions">
+				<button type="button" class="btn btn-ghost ae-modal-cancel">${escapeHtml(l.cancel)}</button>
+				<button type="button" class="btn btn-primary ae-modal-confirm">${escapeHtml(l.create)}</button>
+			</div>
+		</div>
+	`;
+	document.body.appendChild(overlay);
+
+	const confirmBtn = overlay.querySelector<HTMLButtonElement>('.ae-modal-confirm')!;
+	const cancelBtn = overlay.querySelector<HTMLButtonElement>('.ae-modal-cancel')!;
+	const nameInput = overlay.querySelector<HTMLInputElement>('#aeQuickName')!;
+	const searchInput = overlay.querySelector<HTMLInputElement>('#aeQuickSearch')!;
+
+	renderTemplateList('');
+
+	const close = (confirmed: boolean) => {
+		overlay.remove();
+		if (!confirmed || !selected) return;
+		const name = nameInput.value.trim() || 'custom';
+		const result = buildQuickTemplate(selected, name);
+		for (const [relPath, data] of Object.entries(result)) {
+			const path = joinPath(currentDir, relPath);
+			if (files[path] !== undefined) {
+				showToast(t().exists.replace('{name}', relPath));
+				return;
+			}
+			// Ensure parent folders
+			let parent = dirOf(path);
+			while (parent) {
+				if (!explicitFolders.has(parent) && !Object.keys(files).some((p) => p.startsWith(parent))) {
+					explicitFolders.add(parent);
+				}
+				if (parent === '') break;
+				parent = dirOf(parent.slice(0, -1));
+			}
+			files[path] = data;
+		}
+		persistNow();
+		renderTree();
+		// Open the first generated file
+		const firstPath = joinPath(currentDir, Object.keys(result)[0]);
+		if (files[firstPath] !== undefined) openFile(firstPath);
+	};
+
+	confirmBtn.addEventListener('click', () => close(true));
+	cancelBtn.addEventListener('click', () => close(false));
+	overlay.addEventListener('click', (e) => {
+		if (e.target === overlay) close(false);
+	});
+	overlay.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') close(false);
+	});
+	nameInput.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') close(true);
+	});
+
+	searchInput.addEventListener('input', () => {
+		renderTemplateList(searchInput.value);
+	});
+
+	searchInput.focus();
 }
 
 // ---- File operations ----

@@ -7,7 +7,6 @@ import { writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync, readFile
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
-import { Agent } from 'undici';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -26,9 +25,8 @@ const DATA_BASE = 'https://raw.githubusercontent.com/InventivetalentDev/minecraf
 const RECIPE_BASE = `${DATA_BASE}/recipe`;
 const ITEM_TAG_BASE = `${DATA_BASE}/tags/item`;
 
-// HTTP agent with connection pooling
-const agent = new Agent({ connections: 100, keepAliveTimeout: 30000, keepAliveMaxTimeout: 60000 });
-const FETCH_OPTS = { dispatcher: agent, headers: { 'Accept': 'application/json, image/png' } };
+// Bun uses its own HTTP client with built-in pooling
+const FETCH_OPTS = { headers: { 'Accept': 'application/json, image/png' } };
 
 // Caches to avoid redundant work
 const modelCache = new Map();      // key: `${kind}:${name}` -> model JSON (or null)
@@ -634,7 +632,7 @@ function hexToRgb(hex) {
 async function downloadTextureEntry(entry) {
 	if (existsSync(entry.localPath)) return true;
 	try {
-		const res = await fetch(entry.remoteUrl, { dispatcher: agent, headers: { 'Accept': 'image/png' } });
+		const res = await fetch(entry.remoteUrl, { headers: { 'Accept': 'image/png' } });
 		if (!res.ok || !res.body) return false;
 		let pipeline = sharp(Buffer.from(await res.arrayBuffer()), { failOnError: false });
 		if (entry.rotate) {
@@ -648,7 +646,7 @@ async function downloadTextureEntry(entry) {
 			pipeline = pipeline.trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } });
 		}
 		mkdirSync(dirname(entry.localPath), { recursive: true });
-		await pipeline.webp({ lossless: true, effort: 6 }).toFile(entry.localPath);
+		await pipeline.webp({ lossless: true, effort: 4 }).toFile(entry.localPath);
 		return true;
 	} catch {
 		return false;
@@ -658,12 +656,12 @@ async function downloadTextureEntry(entry) {
 /** Download a head skin to /textures/block and return its pixel dimensions. */
 async function downloadSkin(remoteUrl, localPath) {
 	if (!existsSync(localPath)) {
-		const res = await fetch(remoteUrl, { dispatcher: agent, headers: { 'Accept': 'image/png' } });
+		const res = await fetch(remoteUrl, { headers: { 'Accept': 'image/png' } });
 		if (!res.ok) return { width: 64, height: 64 };
 		const buf = Buffer.from(await res.arrayBuffer());
 		const meta = await sharp(buf).metadata();
 		mkdirSync(dirname(localPath), { recursive: true });
-		await sharp(buf, { failOnError: false }).webp({ lossless: true, effort: 6 }).toFile(localPath);
+		await sharp(buf, { failOnError: false }).webp({ lossless: true, effort: 4 }).toFile(localPath);
 		return { width: meta.width || 64, height: meta.height || 64 };
 	}
 	try {
@@ -772,7 +770,7 @@ async function downloadBannerParts(color, hex) {
 	const clothPath = join(texturesDir, 'block', `banner_cloth_${color}.webp`);
 	const polePath = join(texturesDir, 'block', 'banner_pole.webp');
 
-	const res = await fetch(`${ENTITY_TEXTURE_BASE}/banner/banner_base.png`, { dispatcher: agent, headers: { 'Accept': 'image/png' } });
+	const res = await fetch(`${ENTITY_TEXTURE_BASE}/banner/banner_base.png`, { headers: { 'Accept': 'image/png' } });
 	if (!res.ok) return { cloth: `banner_cloth_${color}`, pole: 'banner_pole' };
 	const { data, info } = await sharp(Buffer.from(await res.arrayBuffer()), { failOnError: false }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 	const w = info.width, h = info.height;
@@ -804,14 +802,14 @@ async function downloadBannerParts(color, hex) {
 	if (!existsSync(clothPath)) {
 		await tintCrop(0, split, cloth)
 			.trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
-			.webp({ lossless: true, effort: 6 })
+			.webp({ lossless: true, effort: 4 })
 			.toFile(clothPath);
 	}
 
 	if (!existsSync(polePath)) {
 		await tintCrop(split, w, pole)
 			.trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
-			.webp({ lossless: true, effort: 6 })
+			.webp({ lossless: true, effort: 4 })
 			.toFile(polePath);
 	}
 
@@ -1006,12 +1004,19 @@ async function downloadTextures(tasks) {
 
 	console.log(`Downloading ${unique.length} textures...`);
 	let downloaded = 0;
-	const concurrency = 50;
-	for (let i = 0; i < unique.length; i += concurrency) {
-		const batch = unique.slice(i, i + concurrency);
-		const results = await Promise.allSettled(batch.map((t) => downloadTextureEntry(t)));
-		downloaded += results.filter((r) => r.status === 'fulfilled' && r.value).length;
-	}
+	const queue = [...unique];
+
+	const worker = async () => {
+		while (queue.length > 0) {
+			const t = queue.pop();
+			if (!t) continue;
+			if (await downloadTextureEntry(t)) downloaded++;
+		}
+	};
+
+	const workers = new Array(Math.min(50, queue.length)).fill(null).map(() => worker());
+	await Promise.all(workers);
+
 	console.log(`Downloaded ${downloaded}/${unique.length} textures`);
 }
 

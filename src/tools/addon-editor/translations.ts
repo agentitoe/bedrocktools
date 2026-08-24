@@ -31,9 +31,24 @@ export const translations: TranslationTable = {
 		// Editor toolbar
 		newFile: "➕ Archivo",
 		newFolder: "📁 Carpeta",
+		quickAdd: "⚡ Añadir rápido",
+		quickAddTitle: "Crear archivo desde plantilla",
 		uploadFiles: "⬆️ Subir archivos",
 		download: "⬇️ Descargar",
 		startOver: "↺ Nuevo / Abrir",
+		docsHelp: "📖 Ver documentación",
+		docsHelpTitle: "Abrir la documentación de la wiki para este tipo de archivo",
+
+		// Quick-add modal
+		quickAddHeading: "Crear archivo desde plantilla",
+		quickAddHint: "Elige una plantilla según lo que quieras crear. El archivo se generará en la carpeta actual.",
+		quickAddNameLabel: "Nombre del elemento (ej: mi_entidad, Mi Item)",
+		quickAddNamePh: "mi_elemento",
+		quickAddCategoryBP: "Behavior Pack",
+		quickAddCategoryRP: "Resource Pack",
+		quickAddCategoryOther: "Otros",
+		quickAddNoMatch: "No hay plantillas para esta búsqueda.",
+		quickAddSearch: "Filtrar plantillas…",
 
 		// Tree + editor
 		noFileOpen: "Ningún archivo abierto",
@@ -103,9 +118,24 @@ export const translations: TranslationTable = {
 		// Editor toolbar
 		newFile: "➕ File",
 		newFolder: "📁 Folder",
+		quickAdd: "⚡ Quick Add",
+		quickAddTitle: "Create file from template",
 		uploadFiles: "⬆️ Upload files",
 		download: "⬇️ Download",
 		startOver: "↺ New / Open",
+		docsHelp: "📖 View docs",
+		docsHelpTitle: "Open the wiki documentation for this file type",
+
+		// Quick-add modal
+		quickAddHeading: "Create file from template",
+		quickAddHint: "Pick a template for what you want to create. The file will be generated in the current folder.",
+		quickAddNameLabel: "Element name (e.g. my_entity, My Item)",
+		quickAddNamePh: "my_element",
+		quickAddCategoryBP: "Behavior Pack",
+		quickAddCategoryRP: "Resource Pack",
+		quickAddCategoryOther: "Others",
+		quickAddNoMatch: "No templates match this search.",
+		quickAddSearch: "Filter templates…",
 
 		// Tree + editor
 		noFileOpen: "No file open",
