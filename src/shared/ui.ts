@@ -6,7 +6,7 @@
 //   1. Add an entry to LANGUAGES below (code, flag, label, name).
 //   2. Add a "<code>" object to the `translations` table of each tool/page you
 //      want to translate (see `translations` in each tool's source).
-//   3. Run `npm run build` to regenerate public/assets/ui.js.
+//   3. Run `bun run build` to regenerate public/assets/ui.js.
 // That's it. The dropdown, the toggle label and the fallback pick it up
 // automatically. Pages that haven't been translated yet show that language
 // disabled, and every page always falls back to at least one language.

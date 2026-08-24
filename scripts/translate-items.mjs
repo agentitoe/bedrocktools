@@ -2,7 +2,7 @@
 // Run this after scripts/extract-data.mjs regenerates the data, so the
 // Minecraft Items tool can show names in Spanish as well as English.
 //
-// Usage: node scripts/translate-items.mjs
+// Usage: bun scripts/translate-items.mjs
 
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';

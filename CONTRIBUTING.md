@@ -5,20 +5,20 @@ Thanks for taking an interest. This is a small static site — a set of Minecraf
 ## Getting started
 
 1. Fork and clone the repo.
-2. `npm install`
-3. `npm run dev`, then open [http://localhost:8788/](http://localhost:8788/).
+2. `bun install`
+3. `bun run dev`, then open [http://localhost:8788/](http://localhost:8788/).
 
 ## Before opening a PR
 
 The gate is a typecheck plus the unit tests, then a quick manual check in the browser:
 
 ```bash
-npm run typecheck
-npm test
-node scripts/build.mjs
+bun run typecheck
+bun test
+bun scripts/build.mjs
 ```
 
-Unit tests live in `tests/` and run with Node's built-in test runner (bundled via esbuild). Add one whenever you change pure logic. `tests/tools.test.ts` is a general test that validates every tool's manifest, page, i18n and entry point automatically — new tools are covered with no extra work. Then actually try the change in the browser — the dev server reads files from disk, so a refresh shows built changes.
+Unit tests live in `tests/` and run with Bun's built-in test runner. Add one whenever you change pure logic. `tests/tools.test.ts` is a general test that validates every tool's manifest, page, i18n and entry point automatically — new tools are covered with no extra work. Then actually try the change in the browser — the dev server reads files from disk, so a refresh shows built changes.
 
 ## Conventions
 
@@ -39,7 +39,7 @@ Add the language to `LANGUAGES` in `src/shared/ui.ts`, then a translations objec
 ## Data and generated files
 
 - `public/data/`, `public/textures/` and `public/fonts/` are committed but generated — don't edit them by hand.
-- Regenerate them with `npm run build` (or the individual scripts). It downloads from the Minecraft assets repo, so it's slow and needs network.
+- Regenerate them with `bun run build` (or the individual scripts). It downloads from the Minecraft assets repo, so it's slow and needs network.
 - `public/tools/*/bundle.js`, `public/assets/ui.js` and `public/tools-manifest.json` are generated and git-ignored — don't commit them.
 
 ## Pull requests

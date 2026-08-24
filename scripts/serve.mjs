@@ -5,10 +5,10 @@
 // if you open index.html with file://). No dependencies, no auth, no build.
 //
 // Usage:
-//   npm run dev               # builds the bundles + ui.js, then serves
-//   node scripts/serve.mjs    # serve only (assets must already be built)
+//   bun run dev               # builds the bundles + ui.js, then serves
+//   bun scripts/serve.mjs    # serve only (assets must already be built)
 //
-// The port defaults to 8788; override with PORT=3000 npm run dev.
+// The port defaults to 8788; override with PORT=3000 bun run dev.
 
 import { createServer } from "http";
 import { readFile, stat } from "fs/promises";
