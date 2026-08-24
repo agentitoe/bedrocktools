@@ -286,28 +286,29 @@
             let lastDownload = null;
 
             function renderSuccessCard(lang, url, newName) {
-                const card = document.createElement("div");
-                card.className = "status-card";
-
-                const success = document.createElement("p");
-                success.className = "success";
-                success.style.margin = "0 0 10px";
-                success.textContent = translations[lang].successText;
-
-                const link = document.createElement("a");
-                link.className = "download";
-                link.href = url;
-                link.setAttribute("download", newName);
-                link.textContent = translations[lang].downloadText + " " + newName;
-
-                const note = document.createElement("p");
-                note.className = "link-note";
-                note.textContent = translations[lang].linkNote;
-
-                card.appendChild(success);
-                card.appendChild(link);
-                card.appendChild(note);
-                return card;
+                const escapeHtml = (value) =>
+                    String(value)
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#39;");
+                const safeName = escapeHtml(newName);
+                return (
+                    '<div class="status-card"><p class="success" style="margin:0 0 10px">' +
+                    translations[lang].successText +
+                    '</p><a class="download" href="' +
+                    url +
+                    '" download="' +
+                    safeName +
+                    '">' +
+                    translations[lang].downloadText +
+                    " " +
+                    safeName +
+                    '</a><p class="link-note">' +
+                    translations[lang].linkNote +
+                    "</p></div>"
+                );
             }
 
             function renderErrorCard(lang, message) {
@@ -431,8 +432,7 @@
                     });
                     const url = URL.createObjectURL(blob);
                     lastDownload = { url, newName };
-                    status.innerHTML = "";
-                    status.appendChild(renderSuccessCard(lang, url, newName));
+                    status.innerHTML = renderSuccessCard(lang, url, newName);
                 } catch (err) {
                     lastDownload = null;
                     status.innerHTML = renderErrorCard(lang, err.message);
