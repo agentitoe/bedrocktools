@@ -40,6 +40,7 @@
 | ⚒️ | Recipe Creator         | `/tools/recipe-creator`        | Java + Bedrock | Writes custom recipes — a `.mcpack` for Bedrock or a Data Pack for Java.                       |
 | 🗺️ | Coordinates Calculator | `/tools/coordinates-converter` | Java + Bedrock | Overworld ↔ Nether coordinates, using the 1:8 rule.                                             |
 | 🎁 | /give Generator        | `/tools/give-creator`        | Java + Bedrock | Builds custom `/give` commands: name, lore, enchantments, attributes, potions and more.             |
+| 🧩 | Addon Editor           | `/tools/addon-editor`        | Bedrock        | Create and edit Behavior/Resource Packs with a file tree, code editor and a final download.       |
 
 It's a purely static site: each tool is just an HTML page plus a small ES module bundle, and all the actual work happens client-side.
 
