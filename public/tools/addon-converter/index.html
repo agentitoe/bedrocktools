@@ -1,261 +1,427 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Addon Converter for Minecraft Bedrock. Upload your .mcpack or .mcaddon file to activate achievements on Xbox.">
-<meta name="keywords" content="addon converter, minecraft bedrock, mcpack, mcaddon, achievements, xbox, bedrock tools">
-<link rel="canonical" href="https://bedrocktools.pages.dev/tools/addon-converter/">
-<link rel="alternate" hreflang="es" href="https://bedrocktools.pages.dev/tools/addon-converter/" />
-<link rel="alternate" hreflang="en" href="https://bedrocktools.pages.dev/tools/addon-converter/" />
-<link rel="alternate" hreflang="x-default" href="https://bedrocktools.pages.dev/tools/addon-converter/" />
-<meta property="og:type" content="website">
-<meta property="og:title" content="Addon Converter — Bedrock Tools">
-<meta property="og:description" content="Convert .mcpack and .mcaddon files to activate achievements in Minecraft Bedrock for Xbox.">
-<meta property="og:url" content="https://bedrocktools.pages.dev/tools/addon-converter/">
-<meta property="og:site_name" content="Bedrock Tools">
-<meta property="og:image" content="https://bedrocktools.pages.dev/assets/favicon.svg">
-<meta property="og:locale" content="es_ES">
-<meta property="og:locale:alternate" content="en_US" />
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Addon Converter — Bedrock Tools">
-<meta name="twitter:description" content="Convert .mcpack and .mcaddon files to activate achievements in Minecraft Bedrock for Xbox.">
-<meta name="twitter:image" content="https://bedrocktools.pages.dev/assets/favicon.svg">
-<title data-i18n="title">Addon Converter — Bedrock Tools</title>
-<link rel="icon" type="image/webp" href="/assets/favicon.svg">
-<link rel="apple-touch-icon" href="/assets/favicon.svg">
-<link rel="stylesheet" href="../../assets/styles.css">
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Addon Converter",
-  "url": "https://bedrocktools.pages.dev/tools/addon-converter/",
-  "description": "Convert .mcpack and .mcaddon files to activate achievements in Minecraft Bedrock for Xbox.",
-  "applicationCategory": "UtilitiesApplication",
-  "operatingSystem": "Any",
-  "inLanguage": "en",
-  "creator": {
-    "@type": "Organization",
-    "name": "Bedrock Tools"
-  }
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    {
-      "@type": "ListItem",
-      "position": 1,
-      "name": "Home",
-      "item": "https://bedrocktools.pages.dev/"
-    },
-    {
-      "@type": "ListItem",
-      "position": 2,
-      "name": "Addon Converter",
-      "item": "https://bedrocktools.pages.dev/tools/addon-converter/"
-    }
-  ]
-}
-</script>
-</head>
-<body>
-<a class="back-link" href="/">← <span data-i18n="backHome">Back to home</span></a>
-<div class="top-bar">
-<button class="icon-btn lang-toggle" id="langToggle" title="Change language" aria-label="Change language"><span class="noto-color-emoji-regular">🇪🇸</span> <span class="label">ES</span></button>
-<div class="lang-dropdown" id="langDropdown" role="menu"></div>
-<button class="icon-btn theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Toggle theme"><span class="noto-color-emoji-regular">🌙</span></button>
-</div>
-<main>
-<div class="card">
-<h1 data-i18n="heading">Addon Converter</h1>
-<p class="subtitle" data-i18n="description">Sube tu archivo <strong>.mcpack</strong> o <strong>.mcaddon</strong> para activar los logros.</p>
-<form id="uploadForm">
-<div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Upload file">
-<div class="drop-prompt" id="dropPrompt">
-<span class="drop-icon">📁</span>
-<p class="drop-main" data-i18n="dropPrompt"><span class="noto-color-emoji-regular">👋</span> Arrastra tu archivo aquí o <u>haz clic</u> para seleccionar</p>
-<p class="drop-sub" data-i18n="dropSub">Se admite .mcpack y .mcaddon</p>
-</div>
-<div id="fileNameDisplay">
-<span class="noto-color-emoji-regular">📄</span>
-<span id="fileNameText"></span>
-</div>
-<input type="file" id="fileInput" accept=".mcpack,.mcaddon" required>
-</div>
-<div style="text-align:center; margin-top:18px;">
-<button type="submit" id="submitBtn" data-i18n="submitBtn">Convertir pack</button>
-</div>
-</form>
-</div>
-<div id="status"></div>
-</main>
-<footer class="site-footer">
-<div class="container">
-<div class="footer-brand">Bedrock Tools</div>
-<p class="footer-tagline" data-i18n="footerTagline">Herramientas gratuitas para el ecosistema Minecraft Bedrock.</p>
-<p class="footer-copy" data-i18n="copyright">Hecho con ❤️ por AgentitoE</p>
-<p class="footer-links">
-<a class="footer-github" href="https://github.com/agentitoe/bedrocktools" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
-<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-GitHub
-</a>
-</p>
-</div>
-</footer>
-<script type="module">
-import { processPack } from './bundle.js';
-import { initUi, getLang } from '../../assets/ui.js';
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Addon Converter for Minecraft Bedrock. Upload your .mcpack or .mcaddon file to activate achievements on Xbox."
+        />
+        <meta
+            name="keywords"
+            content="addon converter, minecraft bedrock, mcpack, mcaddon, achievements, xbox, bedrock tools"
+        />
+        <link
+            rel="canonical"
+            href="https://bedrocktools.pages.dev/tools/addon-converter/"
+        />
+        <link
+            rel="alternate"
+            hreflang="es"
+            href="https://bedrocktools.pages.dev/tools/addon-converter/"
+        />
+        <link
+            rel="alternate"
+            hreflang="en"
+            href="https://bedrocktools.pages.dev/tools/addon-converter/"
+        />
+        <link
+            rel="alternate"
+            hreflang="x-default"
+            href="https://bedrocktools.pages.dev/tools/addon-converter/"
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Addon Converter — Bedrock Tools" />
+        <meta
+            property="og:description"
+            content="Convert .mcpack and .mcaddon files to activate achievements in Minecraft Bedrock for Xbox."
+        />
+        <meta
+            property="og:url"
+            content="https://bedrocktools.pages.dev/tools/addon-converter/"
+        />
+        <meta property="og:site_name" content="Bedrock Tools" />
+        <meta
+            property="og:image"
+            content="https://bedrocktools.pages.dev/assets/favicon.svg"
+        />
+        <meta property="og:locale" content="es_ES" />
+        <meta property="og:locale:alternate" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Addon Converter — Bedrock Tools" />
+        <meta
+            name="twitter:description"
+            content="Convert .mcpack and .mcaddon files to activate achievements in Minecraft Bedrock for Xbox."
+        />
+        <meta
+            name="twitter:image"
+            content="https://bedrocktools.pages.dev/assets/favicon.svg"
+        />
+        <title data-i18n="title">Addon Converter — Bedrock Tools</title>
+        <link rel="icon" type="image/webp" href="/assets/favicon.svg" />
+        <link rel="apple-touch-icon" href="/assets/favicon.svg" />
+        <link rel="stylesheet" href="../../assets/styles.css" />
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "SoftwareApplication",
+                "name": "Addon Converter",
+                "url": "https://bedrocktools.pages.dev/tools/addon-converter/",
+                "description": "Convert .mcpack and .mcaddon files to activate achievements in Minecraft Bedrock for Xbox.",
+                "applicationCategory": "UtilitiesApplication",
+                "operatingSystem": "Any",
+                "inLanguage": "en",
+                "creator": {
+                    "@type": "Organization",
+                    "name": "Bedrock Tools"
+                }
+            }
+        </script>
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {
+                        "@type": "ListItem",
+                        "position": 1,
+                        "name": "Home",
+                        "item": "https://bedrocktools.pages.dev/"
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "name": "Addon Converter",
+                        "item": "https://bedrocktools.pages.dev/tools/addon-converter/"
+                    }
+                ]
+            }
+        </script>
+    </head>
+    <body>
+        <a class="back-link" href="/"
+            >← <span data-i18n="backHome">Back to home</span></a
+        >
+        <div class="top-bar">
+            <button
+                class="icon-btn lang-toggle"
+                id="langToggle"
+                title="Change language"
+                aria-label="Change language"
+            >
+                <span class="noto-color-emoji-regular">🇪🇸</span>
+                <span class="label">ES</span>
+            </button>
+            <div class="lang-dropdown" id="langDropdown" role="menu"></div>
+            <button
+                class="icon-btn theme-toggle"
+                id="themeToggle"
+                title="Cambiar tema"
+                aria-label="Toggle theme"
+            >
+                <span class="noto-color-emoji-regular">🌙</span>
+            </button>
+        </div>
+        <main>
+            <div class="card">
+                <h1 data-i18n="heading">Addon Converter</h1>
+                <p class="subtitle" data-i18n="description">
+                    Sube tu archivo <strong>.mcpack</strong> o
+                    <strong>.mcaddon</strong> para activar los logros.
+                </p>
+                <form id="uploadForm">
+                    <div
+                        class="drop-zone"
+                        id="dropZone"
+                        role="button"
+                        tabindex="0"
+                        aria-label="Upload file"
+                    >
+                        <div class="drop-prompt" id="dropPrompt">
+                            <span class="drop-icon">📁</span>
+                            <p class="drop-main" data-i18n="dropPrompt">
+                                <span class="noto-color-emoji-regular">👋</span>
+                                Arrastra tu archivo aquí o <u>haz clic</u> para
+                                seleccionar
+                            </p>
+                            <p class="drop-sub" data-i18n="dropSub">
+                                Se admite .mcpack y .mcaddon
+                            </p>
+                        </div>
+                        <div id="fileNameDisplay">
+                            <span class="noto-color-emoji-regular">📄</span>
+                            <span id="fileNameText"></span>
+                        </div>
+                        <input
+                            type="file"
+                            id="fileInput"
+                            accept=".mcpack,.mcaddon"
+                            required
+                        />
+                    </div>
+                    <div style="text-align: center; margin-top: 18px">
+                        <button
+                            type="submit"
+                            id="submitBtn"
+                            data-i18n="submitBtn"
+                        >
+                            Convertir pack
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div id="status"></div>
+        </main>
+        <footer class="site-footer">
+            <div class="container">
+                <div class="footer-brand">Bedrock Tools</div>
+                <p class="footer-tagline" data-i18n="footerTagline">
+                    Herramientas gratuitas para el ecosistema Minecraft Bedrock.
+                </p>
+                <p class="footer-copy" data-i18n="copyright">
+                    Hecho con ❤️ por AgentitoE
+                </p>
+                <p class="footer-links">
+                    <a
+                        class="footer-github"
+                        href="https://github.com/agentitoe/bedrocktools"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="GitHub"
+                    >
+                        <svg
+                            viewBox="0 0 16 16"
+                            width="14"
+                            height="14"
+                            fill="currentColor"
+                            aria-hidden="true"
+                        >
+                            <path
+                                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+                            />
+                        </svg>
+                        GitHub
+                    </a>
+                </p>
+            </div>
+        </footer>
+        <script type="module">
+            import { processPack } from "./bundle.js";
+            import { initUi, getLang } from "../../assets/ui.js";
 
-const translations = {
-es: {
-title: "Addon Converter — Bedrock Tools",
-heading: "Activador de logros para addons",
-description: 'Sube tu archivo <strong>.mcpack</strong> o <strong>.mcaddon</strong> para activar los logros.',
-dropPrompt: '<span class="noto-color-emoji-regular">👋</span> Arrastra tu archivo aquí o <u>haz clic</u> para seleccionar',
-dropSub: "Se admite .mcpack y .mcaddon",
-submitBtn: "Convertir pack",
-processing: "Procesando",
-successText: '<span class="noto-color-emoji-regular">✅</span> Conversión completada. Descarga el archivo:',
-downloadText: '<span class="noto-color-emoji-regular">⬇️</span> Descargar',
-linkNote: "El enlace solo funciona en esta página. Si lo cierras o actualizas, generalo otra vez.",
-selectFile: "Selecciona un archivo",
-unknownError: '<span class="noto-color-emoji-regular">❌</span> Error desconocido',
-changeLanguageTitle: "Cambiar idioma",
-switchToLightTitle: "Cambiar a tema claro",
-switchToDarkTitle: "Cambiar a tema oscuro",
-backHome: "Volver al inicio",
-invalidFile: "Archivo inválido",
-fileTooLarge: "El archivo supera el tamaño máximo permitido (30 MB)",
-processError: "Error al procesar el archivo",
-maxSizeMB: 30,
-footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
-copyright: "Hecho con ♥️ por AgentitoE"
-},
-en: {
-title: "Addon Converter — Bedrock Tools",
-heading: "Addon Achievement Unlocker",
-description: 'Upload your <strong>.mcpack</strong> or <strong>.mcaddon</strong> file to activate achievements.',
-dropPrompt: '<span class="noto-color-emoji-regular">👋</span> Drag your file here or <u>click</u> to select',
-dropSub: ".mcpack and .mcaddon supported",
-submitBtn: "Convert pack",
-processing: "Processing",
-successText: '<span class="noto-color-emoji-regular">✅</span> Conversion completed. Download the file:',
-downloadText: '<span class="noto-color-emoji-regular">⬇️</span> Download',
-linkNote: "This link only works on this page. If you close or refresh it, generate it again.",
-selectFile: "Select a file",
-unknownError: '<span class="noto-color-emoji-regular">❌</span> Unknown error',
-changeLanguageTitle: "Change language",
-switchToLightTitle: "Switch to light theme",
-switchToDarkTitle: "Switch to dark theme",
-backHome: "Back to home",
-invalidFile: "Invalid file",
-fileTooLarge: "File exceeds maximum allowed size (30 MB)",
-processError: "Error processing file",
-maxSizeMB: 30,
-footerTagline: "Free tools for Minecraft, on Java and Bedrock.",
-copyright: "Made with ♥️ by AgentitoE"
-}
-};
+            const translations = {
+                es: {
+                    title: "Addon Converter — Bedrock Tools",
+                    heading: "Activador de logros para addons",
+                    description:
+                        "Sube tu archivo <strong>.mcpack</strong> o <strong>.mcaddon</strong> para activar los logros.",
+                    dropPrompt:
+                        '<span class="noto-color-emoji-regular">👋</span> Arrastra tu archivo aquí o <u>haz clic</u> para seleccionar',
+                    dropSub: "Se admite .mcpack y .mcaddon",
+                    submitBtn: "Convertir pack",
+                    processing: "Procesando",
+                    successText:
+                        '<span class="noto-color-emoji-regular">✅</span> Conversión completada. Descarga el archivo:',
+                    downloadText:
+                        '<span class="noto-color-emoji-regular">⬇️</span> Descargar',
+                    linkNote:
+                        "El enlace solo funciona en esta página. Si lo cierras o actualizas, generalo otra vez.",
+                    selectFile: "Selecciona un archivo",
+                    unknownError:
+                        '<span class="noto-color-emoji-regular">❌</span> Error desconocido',
+                    changeLanguageTitle: "Cambiar idioma",
+                    switchToLightTitle: "Cambiar a tema claro",
+                    switchToDarkTitle: "Cambiar a tema oscuro",
+                    backHome: "Volver al inicio",
+                    invalidFile: "Archivo inválido",
+                    fileTooLarge:
+                        "El archivo supera el tamaño máximo permitido (30 MB)",
+                    processError: "Error al procesar el archivo",
+                    maxSizeMB: 30,
+                    footerTagline:
+                        "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
+                    copyright: "Hecho con ♥️ por AgentitoE",
+                },
+                en: {
+                    title: "Addon Converter — Bedrock Tools",
+                    heading: "Addon Achievement Unlocker",
+                    description:
+                        "Upload your <strong>.mcpack</strong> or <strong>.mcaddon</strong> file to activate achievements.",
+                    dropPrompt:
+                        '<span class="noto-color-emoji-regular">👋</span> Drag your file here or <u>click</u> to select',
+                    dropSub: ".mcpack and .mcaddon supported",
+                    submitBtn: "Convert pack",
+                    processing: "Processing",
+                    successText:
+                        '<span class="noto-color-emoji-regular">✅</span> Conversion completed. Download the file:',
+                    downloadText:
+                        '<span class="noto-color-emoji-regular">⬇️</span> Download',
+                    linkNote:
+                        "This link only works on this page. If you close or refresh it, generate it again.",
+                    selectFile: "Select a file",
+                    unknownError:
+                        '<span class="noto-color-emoji-regular">❌</span> Unknown error',
+                    changeLanguageTitle: "Change language",
+                    switchToLightTitle: "Switch to light theme",
+                    switchToDarkTitle: "Switch to dark theme",
+                    backHome: "Back to home",
+                    invalidFile: "Invalid file",
+                    fileTooLarge: "File exceeds maximum allowed size (30 MB)",
+                    processError: "Error processing file",
+                    maxSizeMB: 30,
+                    footerTagline:
+                        "Free tools for Minecraft, on Java and Bedrock.",
+                    copyright: "Made with ♥️ by AgentitoE",
+                },
+            };
 
-const dropZone = document.getElementById("dropZone");
-const fileInput = document.getElementById("fileInput");
-const form = document.getElementById("uploadForm");
-const status = document.getElementById("status");
-const submitBtn = document.getElementById("submitBtn");
-const dropPrompt = document.getElementById("dropPrompt");
-const fileNameDisplay = document.getElementById("fileNameDisplay");
-let currentFile = null;
-let lastDownload = null;
+            const dropZone = document.getElementById("dropZone");
+            const fileInput = document.getElementById("fileInput");
+            const form = document.getElementById("uploadForm");
+            const status = document.getElementById("status");
+            const submitBtn = document.getElementById("submitBtn");
+            const dropPrompt = document.getElementById("dropPrompt");
+            const fileNameDisplay = document.getElementById("fileNameDisplay");
+            let currentFile = null;
+            let lastDownload = null;
 
-function renderSuccessCard(lang, url, newName) {
-return '<div class="status-card"><p class="success" style="margin:0 0 10px">' + translations[lang].successText + '</p><a class="download" href="' + url + '" download="' + newName + '">' + translations[lang].downloadText + ' ' + newName + '</a><p class="link-note">' + translations[lang].linkNote + '</p></div>';
-}
+            function renderSuccessCard(lang, url, newName) {
+                return (
+                    '<div class="status-card"><p class="success" style="margin:0 0 10px">' +
+                    translations[lang].successText +
+                    '</p><a class="download" href="' +
+                    url +
+                    '" download="' +
+                    newName +
+                    '">' +
+                    translations[lang].downloadText +
+                    " " +
+                    newName +
+                    '</a><p class="link-note">' +
+                    translations[lang].linkNote +
+                    "</p></div>"
+                );
+            }
 
-function renderErrorCard(lang, message) {
-return '<div class="status-card"><p class="error" style="margin:0">' + (translations[lang].unknownError || translations.en.unknownError) + ': ' + message + '</p></div>';
-}
+            function renderErrorCard(lang, message) {
+                return (
+                    '<div class="status-card"><p class="error" style="margin:0">' +
+                    (translations[lang].unknownError ||
+                        translations.en.unknownError) +
+                    ": " +
+                    message +
+                    "</p></div>"
+                );
+            }
 
-function updateStatusForLang(lang) {
-if (!status.innerHTML) return;
-const successMatch = status.innerHTML.match(/href="([^"]+)" download="([^"]+)"/);
-if (successMatch) {
-status.innerHTML = renderSuccessCard(lang, successMatch[1], successMatch[2]);
-}
-}
+            function updateStatusForLang(lang) {
+                if (!status.innerHTML) return;
+                const successMatch = status.innerHTML.match(
+                    /href="([^"]+)" download="([^"]+)"/,
+                );
+                if (successMatch) {
+                    status.innerHTML = renderSuccessCard(
+                        lang,
+                        successMatch[1],
+                        successMatch[2],
+                    );
+                }
+            }
 
-function showSelectedName(file) {
-if (file) {
-document.getElementById("fileNameText").textContent = file.name;
-document.getElementById("fileNameDisplay").style.display = "flex";
-dropPrompt.style.display = "none";
-} else {
-document.getElementById("fileNameDisplay").style.display = "none";
-dropPrompt.style.display = "";
-}
-}
+            function showSelectedName(file) {
+                if (file) {
+                    document.getElementById("fileNameText").textContent =
+                        file.name;
+                    document.getElementById("fileNameDisplay").style.display =
+                        "flex";
+                    dropPrompt.style.display = "none";
+                } else {
+                    document.getElementById("fileNameDisplay").style.display =
+                        "none";
+                    dropPrompt.style.display = "";
+                }
+            }
 
-dropZone.addEventListener("click", () => fileInput.click());
-dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
-dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
-dropZone.addEventListener("drop", (e) => {
-e.preventDefault();
-dropZone.classList.remove("dragover");
-const files = Array.from(e.dataTransfer.files);
-if (files.length > 0) {
-currentFile = files[0];
-const dt = new DataTransfer();
-dt.items.add(currentFile);
-fileInput.files = dt.files;
-showSelectedName(currentFile);
-}
-});
+            dropZone.addEventListener("click", () => fileInput.click());
+            dropZone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                dropZone.classList.add("dragover");
+            });
+            dropZone.addEventListener("dragleave", () =>
+                dropZone.classList.remove("dragover"),
+            );
+            dropZone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                dropZone.classList.remove("dragover");
+                const files = Array.from(e.dataTransfer.files);
+                if (files.length > 0) {
+                    currentFile = files[0];
+                    const dt = new DataTransfer();
+                    dt.items.add(currentFile);
+                    fileInput.files = dt.files;
+                    showSelectedName(currentFile);
+                }
+            });
 
-fileInput.addEventListener("change", () => {
-if (fileInput.files.length) {
-currentFile = fileInput.files[0];
-showSelectedName(currentFile);
-}
-});
+            fileInput.addEventListener("change", () => {
+                if (fileInput.files.length) {
+                    currentFile = fileInput.files[0];
+                    showSelectedName(currentFile);
+                }
+            });
 
-form.addEventListener("submit", async (e) => {
-e.preventDefault();
-const file = currentFile || fileInput.files[0];
-if (!file) { alert(translations[getLang()].selectFile); return; }
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const file = currentFile || fileInput.files[0];
+                if (!file) {
+                    alert(translations[getLang()].selectFile);
+                    return;
+                }
 
-submitBtn.disabled = true;
-dropZone.style.opacity = "0.7";
-dropZone.style.pointerEvents = "none";
-const lang = getLang();
-status.innerHTML = '<div class="status-card"><div class="status-row"><span class="spinner"></span><span style="color:var(--primary);font-weight:600">' + translations[lang].processing + ' ' + file.name + '…</span></div></div>';
+                submitBtn.disabled = true;
+                dropZone.style.opacity = "0.7";
+                dropZone.style.pointerEvents = "none";
+                const lang = getLang();
+                status.innerHTML =
+                    '<div class="status-card"><div class="status-row"><span class="spinner"></span><span style="color:var(--primary);font-weight:600">' +
+                    translations[lang].processing +
+                    " " +
+                    file.name +
+                    "…</span></div></div>";
 
-try {
-const buffer = await file.arrayBuffer();
-if (buffer.byteLength > 30 * 1024 * 1024) {
-throw new Error(translations[lang].fileTooLarge);
-}
-const data = new Uint8Array(buffer);
-const result = await processPack(data);
-const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
-const base = file.name.slice(0, file.name.lastIndexOf(".") || file.name.length);
-const newName = ext ? base + "_MODIFIED" + ext : file.name + "_MODIFIED";
-const blob = new Blob([result], { type: "application/zip" });
-const url = URL.createObjectURL(blob);
-lastDownload = { url, newName };
-status.innerHTML = renderSuccessCard(lang, url, newName);
-} catch (err) {
-lastDownload = null;
-status.innerHTML = renderErrorCard(lang, err.message);
-} finally {
-submitBtn.disabled = false;
-dropZone.style.opacity = "1";
-dropZone.style.pointerEvents = "auto";
-}
-});
-initUi(translations, { onApplyLang: updateStatusForLang });
-</script>
-</body>
+                try {
+                    const buffer = await file.arrayBuffer();
+                    if (buffer.byteLength > 30 * 1024 * 1024) {
+                        throw new Error(translations[lang].fileTooLarge);
+                    }
+                    const data = new Uint8Array(buffer);
+                    const result = await processPack(data);
+                    const ext = file.name.includes(".")
+                        ? file.name.slice(file.name.lastIndexOf("."))
+                        : "";
+                    const base = file.name.slice(
+                        0,
+                        file.name.lastIndexOf(".") || file.name.length,
+                    );
+                    const newName = ext
+                        ? base + "_MODIFIED" + ext
+                        : file.name + "_MODIFIED";
+                    const blob = new Blob([result], {
+                        type: "application/zip",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    lastDownload = { url, newName };
+                    status.innerHTML = renderSuccessCard(lang, url, newName);
+                } catch (err) {
+                    lastDownload = null;
+                    status.innerHTML = renderErrorCard(lang, err.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    dropZone.style.opacity = "1";
+                    dropZone.style.pointerEvents = "auto";
+                }
+            });
+            initUi(translations, { onApplyLang: updateStatusForLang });
+        </script>
+    </body>
 </html>
