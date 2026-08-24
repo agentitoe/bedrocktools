@@ -311,12 +311,18 @@
             }
 
             function renderErrorCard(lang, message) {
+                const safeMessage = String(message)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
                 return (
                     '<div class="status-card"><p class="error" style="margin:0">' +
                     (translations[lang].unknownError ||
                         translations.en.unknownError) +
                     ": " +
-                    message +
+                    safeMessage +
                     "</p></div>"
                 );
             }
