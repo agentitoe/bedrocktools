@@ -1,12 +1,9 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { readdirSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { pathToFileURL } from "url";
 import { LANGUAGES } from "../src/shared/ui";
 
-// The test runner (scripts/test.mjs) sets PROJECT_ROOT and pre-bundles each
-// tool's manifest/translations into .test-dist/tools/<slug>/.
+// Bun can import TypeScript files directly, no pre-bundling needed.
 const root = process.env.PROJECT_ROOT ?? process.cwd();
 const srcToolsDir = join(root, "src", "tools");
 const publicToolsDir = join(root, "public", "tools");
@@ -39,17 +36,16 @@ for (const slug of slugs) {
 	const hasTranslations = existsSync(join(toolDir, "translations.ts"));
 	const hasIndex = existsSync(join(toolDir, "index.ts"));
 
-	// Import the pre-bundled modules by absolute file URL so esbuild leaves the
-	// dynamic import alone (it would otherwise try to resolve the glob at build time).
+	// Bun can import TypeScript source files directly.
 	let manifest: any;
 	if (hasManifest) {
-		const mod = await import(pathToFileURL(join(root, ".test-dist", "tools", slug, "manifest.mjs")).href);
+		const mod = await import(`../src/tools/${slug}/manifest.ts`);
 		manifest = mod.manifest;
 	}
 
 	let translations: any;
 	if (hasTranslations) {
-		const mod = await import(pathToFileURL(join(root, ".test-dist", "tools", slug, "translations.mjs")).href);
+		const mod = await import(`../src/tools/${slug}/translations.ts`);
 		translations = mod.translations;
 	}
 
@@ -60,53 +56,47 @@ for (const slug of slugs) {
 
 for (const tool of tools) {
 	test(`tool "${tool.slug}" has the required files`, () => {
-		assert.ok(tool.hasManifest, "missing manifest.ts");
-		assert.ok(tool.hasIndex, "missing index.ts");
+		expect(tool.hasManifest).toBe(true);
+		expect(tool.hasIndex).toBe(true);
 	});
 
 	test(`tool "${tool.slug}" has a valid manifest`, () => {
 		const m = tool.manifest;
-		assert.ok(m && typeof m === "object", "manifest.ts must export a `manifest` object");
+		expect(m && typeof m === "object").toBe(true);
 
 		for (const lang of LANGUAGES) {
-			assert.ok(
-				typeof m.name?.[lang.code] === "string" && m.name[lang.code].length > 0,
-				`manifest.name.${lang.code} must be a non-empty string`
-			);
-			assert.ok(
-				typeof m.description?.[lang.code] === "string" && m.description[lang.code].length > 0,
-				`manifest.description.${lang.code} must be a non-empty string`
-			);
+			expect(typeof m.name?.[lang.code] === "string" && m.name[lang.code].length > 0).toBe(true);
+			expect(typeof m.description?.[lang.code] === "string" && m.description[lang.code].length > 0).toBe(true);
 		}
 
-		assert.ok(typeof m.icon === "string" && m.icon.length > 0, "manifest.icon must be a non-empty string");
+		expect(typeof m.icon === "string" && m.icon.length > 0).toBe(true);
 
-		assert.equal(typeof m.path, "string", "manifest.path must be a string");
-		assert.match(m.path, PATH_RE, `manifest.path "${m.path}" must look like /tools/<slug>`);
+		expect(typeof m.path).toBe("string");
+		expect(m.path).toMatch(PATH_RE);
 
-		assert.equal(typeof m.color, "string", "manifest.color must be a string");
-		assert.match(m.color, COLOR_RE, `manifest.color "${m.color}" must be #RRGGBB`);
+		expect(typeof m.color).toBe("string");
+		expect(m.color).toMatch(COLOR_RE);
 
 		if (m.platforms !== undefined) {
-			assert.ok(Array.isArray(m.platforms) && m.platforms.length > 0, "manifest.platforms must be a non-empty array");
+			expect(Array.isArray(m.platforms) && m.platforms.length > 0).toBe(true);
 			for (const platform of m.platforms) {
-				assert.ok(ALLOWED_PLATFORMS.has(platform), `unknown platform "${platform}"`);
+				expect(ALLOWED_PLATFORMS.has(platform)).toBe(true);
 			}
 		}
 	});
 
 	test(`tool "${tool.slug}" has a page matching its manifest path`, () => {
 		const page = join(root, "public", tool.manifest.path, "index.html");
-		assert.ok(existsSync(page), `missing page at public${tool.manifest.path}/index.html`);
+		expect(existsSync(page)).toBe(true);
 	});
 
 	test(`tool "${tool.slug}" has consistent translations`, () => {
 		if (!tool.hasTranslations) return; // optional: file tools may not have UI copy
 
-		assert.ok(tool.translations && typeof tool.translations === "object", "translations.ts must export a `translations` object");
+		expect(tool.translations && typeof tool.translations === "object").toBe(true);
 
 		for (const lang of LANGUAGES) {
-			assert.ok(tool.translations[lang.code], `missing "${lang.code}" translations`);
+			expect(tool.translations[lang.code]).toBeTruthy();
 		}
 
 		const codes = Object.keys(tool.translations);
@@ -115,21 +105,15 @@ for (const tool of tools) {
 			const keys = new Set(Object.keys(tool.translations[code]));
 			const missing = [...reference].filter((k) => !keys.has(k));
 			const extra = [...keys].filter((k) => !reference.has(k));
-			assert.deepEqual(
-				{ missing, extra },
-				{ missing: [], extra: [] },
-				`language "${code}" keys differ from "${codes[0]}"`
-			);
+			expect({ missing, extra }).toEqual({ missing: [], extra: [] });
 		}
 	});
 
 	test(`tool "${tool.slug}" index.ts exports an entry point`, () => {
 		const source = tool.indexSource;
-		if (source === null) {
-			assert.fail("missing index.ts");
-			return;
-		}
-		assert.match(source, /export\s+(async\s+)?function\s+\w+/, "index.ts must export at least one function");
+		expect(source).not.toBeNull();
+		if (source === null) return;
+		expect(source).toMatch(/export\s+(async\s+)?function\s+\w+/);
 	});
 }
 
@@ -141,6 +125,6 @@ test("every page directory has a matching tool manifest", () => {
 	const manifestPaths = new Set(tools.map((t) => t.manifest?.path));
 
 	for (const dir of pageDirs) {
-		assert.ok(manifestPaths.has(`/tools/${dir}`), `public/tools/${dir} has no manifest with path "/tools/${dir}"`);
+		expect(manifestPaths.has(`/tools/${dir}`)).toBe(true);
 	}
 });

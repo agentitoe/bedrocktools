@@ -1,8 +1,6 @@
-import * as esbuild from "esbuild";
 import { readdirSync, statSync, mkdirSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -11,45 +9,49 @@ const outDir = join(root, "public", "tools");
 const publicDir = join(root, "public");
 
 const commonBuildOptions = {
-	bundle: true,
 	minify: true,
 	format: "esm",
-	platform: "browser",
-	target: ["es2021"],
+	target: "browser",
 };
 
 async function buildTool(toolName, toolDir) {
 	const indexTs = join(toolDir, "index.ts");
 	const toolOutDir = join(outDir, toolName);
 	mkdirSync(toolOutDir, { recursive: true });
-	const outfile = join(toolOutDir, "bundle.js");
 
 	console.log("Building " + toolName + "...");
-	await esbuild.build({
-		entryPoints: [indexTs],
-		outfile: outfile,
+	const result = await Bun.build({
+		entrypoints: [indexTs],
+		outdir: toolOutDir,
+		naming: { entry: "bundle.[ext]" },
 		...commonBuildOptions,
 	});
+	if (!result.success) {
+		for (const log of result.logs) console.error(log);
+		throw new Error(`Build failed for ${toolName}`);
+	}
 }
 
 async function buildSharedUi() {
 	const uiTs = join(root, "src", "shared", "ui.ts");
 	const assetsDir = join(publicDir, "assets");
 	mkdirSync(assetsDir, { recursive: true });
-	await esbuild.build({
-		entryPoints: [uiTs],
-		outfile: join(assetsDir, "ui.js"),
-		bundle: true,
-		minify: false,
+
+	const result = await Bun.build({
+		entrypoints: [uiTs],
+		outdir: assetsDir,
+		target: "browser",
 		format: "esm",
-		platform: "browser",
-		target: ["es2021"],
+		minify: false,
 	});
+	if (!result.success) {
+		for (const log of result.logs) console.error(log);
+		throw new Error("Build failed for shared UI");
+	}
 }
 
 function findToolDirs() {
-	const entries = readdirSync(srcToolsDir);
-	return entries
+	return readdirSync(srcToolsDir)
 		.filter((name) => name !== "_template")
 		.filter((name) => {
 			const toolDir = join(srcToolsDir, name);
@@ -69,19 +71,10 @@ async function gatherManifests() {
 		if (!existsSync(manifestTs)) continue;
 
 		try {
-			const result = await esbuild.build({
-				entryPoints: [manifestTs],
-				write: false,
-				format: "cjs",
-				platform: "node",
-			});
-			const code = result.outputFiles[0].text;
-			const fn = new Function("exports", "require", "module", code);
-			const mod = { exports: {} };
-			fn(mod.exports, () => {
-				throw new Error("require not available in manifest");
-			}, mod);
-			const manifest = mod.exports.manifest || mod.exports.default;
+			// Bun can import TypeScript files directly — no bundling needed for
+			// manifests since they're pure data with no dependencies.
+			const mod = await import(manifestTs);
+			const manifest = mod.manifest;
 			if (manifest) {
 				manifests.push({
 					name: manifest.name,

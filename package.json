@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs && node scripts/extract-data.mjs && node scripts/translate-items.mjs",
+    "build": "bun scripts/build.mjs && bun scripts/extract-data.mjs && bun scripts/translate-items.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/test.mjs",
-    "dev": "npm run build && node scripts/serve.mjs",
+    "test": "bun test",
+    "dev": "bun run build && bun scripts/serve.mjs",
     "deploy": "wrangler pages deploy public"
   },
   "dependencies": {
@@ -16,7 +16,6 @@
     "sharp": "^0.35.3"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "wrangler": "^4.35.0"
   }

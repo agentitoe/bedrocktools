@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import {
 	projectToIsometric,
 	projectFaces,
@@ -9,7 +8,7 @@ import {
 } from "../src/tools/minecraft-items/isometric-projector";
 
 test("projectToIsometric keeps x and flips y for canvas space", () => {
-	assert.deepEqual(projectToIsometric({ x: 1, y: 2, z: 3 }), { x: 1, y: -2 });
+	expect(projectToIsometric({ x: 1, y: 2, z: 3 })).toEqual({ x: 1, y: -2 });
 });
 
 test("projectFaces culls faces whose normal points away from the camera", () => {
@@ -40,8 +39,8 @@ test("projectFaces culls faces whose normal points away from the camera", () => 
 	];
 
 	const projected = projectFaces(faces);
-	assert.equal(projected.length, 1);
-	assert.equal(projected[0].textureRef, "front");
+	expect(projected.length).toBe(1);
+	expect(projected[0].textureRef).toBe("front");
 });
 
 test("sortFacesByDepth sorts back to front without mutating the input", () => {
@@ -50,8 +49,8 @@ test("sortFacesByDepth sorts back to front without mutating the input", () => {
 	const c = { vertices: [], uv: [], textureRef: "c", avgDepth: 3, normal: { x: 0, y: 0, z: 1 } };
 
 	const sorted = sortFacesByDepth([a, b, c]);
-	assert.deepEqual(sorted.map((f) => f.textureRef), ["a", "c", "b"]);
-	assert.deepEqual([a, b, c].map((f) => f.textureRef), ["a", "b", "c"]);
+	expect(sorted.map((f) => f.textureRef)).toEqual(["a", "c", "b"]);
+	expect([a, b, c].map((f) => f.textureRef)).toEqual(["a", "b", "c"]);
 });
 
 test("fitToCanvas scales and centers the geometry", () => {
@@ -64,12 +63,12 @@ test("fitToCanvas scales and centers the geometry", () => {
 	};
 
 	const [fitted] = fitToCanvas([face], 100, 0);
-	assert.deepEqual(fitted.vertices[0], { x: 0, y: 0 });
-	assert.deepEqual(fitted.vertices[2], { x: 100, y: 100 });
+	expect(fitted.vertices[0]).toEqual({ x: 0, y: 0 });
+	expect(fitted.vertices[2]).toEqual({ x: 100, y: 100 });
 });
 
 test("fitToCanvas returns an empty array for empty input", () => {
-	assert.deepEqual(fitToCanvas([], 100), []);
+	expect(fitToCanvas([], 100)).toEqual([]);
 });
 
 test("calculateBounds reports the min/max extents", () => {
@@ -81,5 +80,5 @@ test("calculateBounds reports the min/max extents", () => {
 		normal: { x: 0, y: 0, z: 1 }
 	};
 
-	assert.deepEqual(calculateBounds([face]), { minX: -5, maxX: 7, minY: -2, maxY: 3 });
+	expect(calculateBounds([face])).toEqual({ minX: -5, maxX: 7, minY: -2, maxY: 3 });
 });

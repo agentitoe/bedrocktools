@@ -9,3 +9,6 @@ package-lock.json
 public/tools-manifest.json
 bun.lock
 .test-dist
+# SOFA credentials
+.sofa/
+AGENTS.md

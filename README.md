@@ -23,7 +23,7 @@
     <img alt="Website" src="https://img.shields.io/badge/website-bedrocktools.pages.dev-F38020?style=flat-square&logo=cloudflare&logoColor=white">
   </a>
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white">
-  <img alt="esbuild" src="https://img.shields.io/badge/esbuild-FFCF00?style=flat-square&logo=esbuild&logoColor=black">
+  <img alt="Bun" src="https://img.shields.io/badge/Bun-%23000000.svg?style=flat-square&logo=bun&logoColor=white">
   <img alt="HTML5" src="https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white">
   <img alt="CSS3" src="https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white">
 </p>
@@ -40,37 +40,38 @@
 | ⚒️ | Recipe Creator         | `/tools/recipe-creator`        | Java + Bedrock | Writes custom recipes — a `.mcpack` for Bedrock or a Data Pack for Java.                       |
 | 🗺️ | Coordinates Calculator | `/tools/coordinates-converter` | Java + Bedrock | Overworld ↔ Nether coordinates, using the 1:8 rule.                                             |
 | 🎁 | /give Generator        | `/tools/give-creator`        | Java + Bedrock | Builds custom `/give` commands: name, lore, enchantments, attributes, potions and more.             |
+| 🧩 | Addon Editor           | `/tools/addon-editor`        | Bedrock        | Create and edit Behavior/Resource Packs with a file tree, code editor and a final download.       |
 
 It's a purely static site: each tool is just an HTML page plus a small ES module bundle, and all the actual work happens client-side.
 
 ## Run it locally
 
-You'll need [Node.js](https://nodejs.org/) 18+ and npm.
+You'll need [Bun](https://bun.sh/).
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
-Open [http://localhost:8788/](http://localhost:8788/) — or `PORT=3000 npm run dev` to pick another port.
+Open [http://localhost:8788/](http://localhost:8788/) — or `PORT=3000 bun run dev` to pick another port.
 
-`npm run dev` compiles the tools, then serves `public/` with the tiny built-in server in `scripts/serve.mjs`. It reads files straight from disk, so edits to already-built assets show up on refresh; it does **not** watch or auto-rebuild `.ts` sources, so re-run the build when you change those.
+`bun run dev` compiles the tools, then serves `public/` with the tiny built-in server in `scripts/serve.mjs`. It reads files straight from disk, so edits to already-built assets show up on refresh; it does **not** watch or auto-rebuild `.ts` sources, so re-run the build when you change those.
 
 ## Scripts
 
 | Command            | Purpose                                                                                 |
 | ------------------ | --------------------------------------------------------------------------------------- |
-| `npm run build`  | Rebuilds the bundles **and** regenerates the Minecraft data (slow, needs network). |
-| `npm run dev`    | Build, then serve locally.                                                              |
-| `npm run deploy` | Push `public/` to Cloudflare Pages.                                                    |
+| `bun run build`  | Rebuilds the bundles **and** regenerates the Minecraft data (slow, needs network). |
+| `bun run dev`    | Build, then serve locally.                                                              |
+| `bun run deploy` | Push `public/` to Cloudflare Pages.                                                    |
 
 The full data pipeline is rarely needed day-to-day — the generated data and textures are committed:
 
 ```bash
-node scripts/build.mjs && node scripts/serve.mjs
+bun scripts/build.mjs && bun scripts/serve.mjs
 ```
 
-### What `npm run build` does
+### What `bun run build` does
 
 1. **`scripts/build.mjs`** — bundles each tool into `public/tools/<slug>/bundle.js`, compiles `src/shared/ui.ts` into `public/assets/ui.js`, and writes `public/tools-manifest.json`.
 2. **`scripts/extract-data.mjs`** — downloads Minecraft 26.1 models, textures and recipes from GitHub and writes `public/data/*.json` + `public/textures/*.webp`.
