@@ -13,6 +13,9 @@
   <a href="https://github.com/agentitoe/bedrocktools">
     <img alt="GitHub stars" src="https://img.shields.io/github/stars/agentitoe/bedrocktools?style=flat-square&logo=github">
   </a>
+  <a href="https://www.codefactor.io/repository/github/agentitoe/bedrocktools/overview/main">
+    <img alt="CodeFactor Score" src="https://www.codefactor.io/repository/github/agentitoe/bedrocktools/badge/main">
+  </a>
   <a href="https://github.com/agentitoe/bedrocktools">
     <img alt="Last commit" src="https://img.shields.io/github/last-commit/agentitoe/bedrocktools?style=flat-square">
   </a>
@@ -32,15 +35,15 @@
 
 ## What's inside
 
-| Icon | Tool                   | Path                             | Platform       | Description                                                                                      |
-| ---- | ---------------------- | -------------------------------- | -------------- | ------------------------------------------------------------------------------------------------ |
-| 🛠️ | Addon Converter        | `/tools/addon-converter`       | Bedrock        | Re-saves `.mcpack` / `.mcaddon` files so achievements stay active on Xbox.                    |
-| 📦   | Pack Organizer         | `/tools/pack-organizer`       | Bedrock        | Rearranges `.mcpack` / `.mcaddon` / `.mcworld` into the `com.mojang` layout Xbox expects. |
-| 🧱   | Items & Blocks         | `/tools/minecraft-items`       | Java + Bedrock | Every item and block, with crafting recipes and rendered icons.                                  |
-| ⚒️ | Recipe Creator         | `/tools/recipe-creator`        | Java + Bedrock | Writes custom recipes — a `.mcpack` for Bedrock or a Data Pack for Java.                       |
-| 🗺️ | Coordinates Calculator | `/tools/coordinates-converter` | Java + Bedrock | Overworld ↔ Nether coordinates, using the 1:8 rule.                                             |
-| 🎁 | /give Generator        | `/tools/give-creator`        | Java + Bedrock | Builds custom `/give` commands: name, lore, enchantments, attributes, potions and more.             |
-| 🧩 | Addon Editor           | `/tools/addon-editor`        | Bedrock        | Create and edit Behavior/Resource Packs with a file tree, code editor and a final download.       |
+| Icon | Tool                   | Path                           | Platform       | Description                                                                                 |
+| ---- | ---------------------- | ------------------------------ | -------------- | ------------------------------------------------------------------------------------------- |
+| 🛠️   | Addon Converter        | `/tools/addon-converter`       | Bedrock        | Re-saves `.mcpack` / `.mcaddon` files so achievements stay active on Xbox.                  |
+| 📦   | Pack Organizer         | `/tools/pack-organizer`        | Bedrock        | Rearranges `.mcpack` / `.mcaddon` / `.mcworld` into the `com.mojang` layout Xbox expects.   |
+| 🧱   | Items & Blocks         | `/tools/minecraft-items`       | Java + Bedrock | Every item and block, with crafting recipes and rendered icons.                             |
+| ⚒️   | Recipe Creator         | `/tools/recipe-creator`        | Java + Bedrock | Writes custom recipes — a `.mcpack` for Bedrock or a Data Pack for Java.                    |
+| 🗺️   | Coordinates Calculator | `/tools/coordinates-converter` | Java + Bedrock | Overworld ↔ Nether coordinates, using the 1:8 rule.                                         |
+| 🎁   | /give Generator        | `/tools/give-creator`          | Java + Bedrock | Builds custom `/give` commands: name, lore, enchantments, attributes, potions and more.     |
+| 🧩   | Addon Editor           | `/tools/addon-editor`          | Bedrock        | Create and edit Behavior/Resource Packs with a file tree, code editor and a final download. |
 
 It's a purely static site: each tool is just an HTML page plus a small ES module bundle, and all the actual work happens client-side.
 
@@ -59,11 +62,11 @@ Open [http://localhost:8788/](http://localhost:8788/) — or `PORT=3000 bun run 
 
 ## Scripts
 
-| Command            | Purpose                                                                                 |
-| ------------------ | --------------------------------------------------------------------------------------- |
+| Command          | Purpose                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------- |
 | `bun run build`  | Rebuilds the bundles **and** regenerates the Minecraft data (slow, needs network). |
-| `bun run dev`    | Build, then serve locally.                                                              |
-| `bun run deploy` | Push `public/` to Cloudflare Pages.                                                    |
+| `bun run dev`    | Build, then serve locally.                                                         |
+| `bun run deploy` | Push `public/` to Cloudflare Pages.                                                |
 
 The full data pipeline is rarely needed day-to-day — the generated data and textures are committed:
 
