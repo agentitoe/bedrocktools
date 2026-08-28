@@ -1,0 +1,77 @@
+version: 2.1
+
+orbs:
+  sonarcloud: sonarsource/sonarcloud@4.0
+  codecov: codecov/codecov@6.0.0
+
+executors:
+  bun:
+    docker:
+      # Ubuntu base image: has curl/unzip/git (needed by the SonarCloud orb)
+      # and the Bun installer. Home is /home/circleci.
+      - image: cimg/base:22.04
+
+commands:
+  install-bun:
+    description: Install the Bun runtime via the official installer
+    steps:
+      - run:
+          name: Install Bun
+          command: |
+            curl -fsSL https://bun.sh/install | bash
+            echo 'export PATH="$HOME/.bun/bin:$PATH"' >> "$BASH_ENV"
+
+jobs:
+  test:
+    description: Typecheck, test & build
+    executor: bun
+    steps:
+      - checkout
+      - install-bun
+      - run:
+          name: Install dependencies
+          command: bun install
+      - run:
+          name: Typecheck
+          command: bun run typecheck
+      - run:
+          name: Test
+          command: bun test --coverage --coverage-reporter=lcov
+      - sonarcloud/scan
+      - codecov/upload:
+          files: coverage/lcov.info
+      - run:
+          name: Build
+          command: bun run build
+
+  deploy:
+    description: Deploy
+    executor: bun
+    steps:
+      - checkout
+      - install-bun
+      - run:
+          name: Install dependencies
+          command: bun install
+      - run:
+          name: Build
+          command: bun run build
+      - run:
+          name: Deploy to Cloudflare Pages
+          command: |
+            if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+              echo "WARNING: skipping deploy - CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID"
+              echo "are not configured. Add them in Project Settings -> Environment"
+              echo "Variables to enable Cloudflare Pages deploys."
+              exit 0
+            fi
+            bunx wrangler pages deploy public \
+              --project-name=bedrocktools \
+workflows:
+  version: 2
+  build-and-deploy:
+    jobs:
+      - test
+      - deploy:
+          requires:
+            - test
