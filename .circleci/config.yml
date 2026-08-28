@@ -44,13 +44,12 @@ jobs:
               echo "Add it in Project Settings -> Environment Variables to enable scanning."
               exit 0
             fi
-            SONAR_SCANNER_VERSION=6.2.1.4610
+            SONAR_SCANNER_VERSION=8.1.0.6389
             curl -sSLo /tmp/sonar-scanner.zip \
               "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip"
             unzip -q /tmp/sonar-scanner.zip -d /tmp/
             "/tmp/sonar-scanner-${SONAR_SCANNER_VERSION}-linux-x64/bin/sonar-scanner" \
               -Dsonar.token="$SONAR_TOKEN" \
-              -Dsonar.host.url=https://sonarcloud.io
       - codecov/upload:
           files: coverage/lcov.info
       - run:
