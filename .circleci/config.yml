@@ -65,7 +65,7 @@ jobs:
               echo "Variables to enable Cloudflare Pages deploys."
               exit 0
             fi
-            bunx wrangler pages deploy public \
+            bun x wrangler pages deploy public \
               --project-name=bedrocktools \
 workflows:
   version: 2
