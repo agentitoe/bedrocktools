@@ -36,20 +36,6 @@ jobs:
       - run:
           name: Test
           command: bun test --coverage --coverage-reporter=lcov
-      - run:
-          name: SonarQube Cloud
-          command: |
-            if [ -z "$SONAR_TOKEN" ]; then
-              echo "WARNING: skipping SonarQube scan - SONAR_TOKEN is not configured."
-              echo "Add it in Project Settings -> Environment Variables to enable scanning."
-              exit 0
-            fi
-            SONAR_SCANNER_VERSION=8.1.0.6389
-            curl -sSLo /tmp/sonar-scanner.zip \
-              "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip"
-            unzip -q /tmp/sonar-scanner.zip -d /tmp/
-            "/tmp/sonar-scanner-${SONAR_SCANNER_VERSION}-linux-x64/bin/sonar-scanner" \
-              -Dsonar.token="$SONAR_TOKEN" \
       - codecov/upload:
           files: coverage/lcov.info
       - run:
