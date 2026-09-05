@@ -1,4 +1,4 @@
-import { readdirSync, statSync, mkdirSync, writeFileSync, existsSync } from "fs";
+import { readdirSync, statSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -167,6 +167,23 @@ function isUpToDate(outFile, srcFiles) {
 	return true;
 }
 
+/** openapi.yaml (root) is the single source of truth: copy + JSON to public/. */
+async function syncOpenApi() {
+	const srcYaml = join(root, "openapi.yaml");
+	if (!existsSync(srcYaml)) return;
+	const yamlText = readFileSync(srcYaml, "utf8");
+	mkdirSync(publicDir, { recursive: true });
+	writeFileSync(join(publicDir, "openapi.yaml"), yamlText);
+	try {
+		const { load } = await import("js-yaml");
+		const data = load(yamlText);
+		writeFileSync(join(publicDir, "openapi.json"), JSON.stringify(data, null, 2) + "\n");
+		console.log("Synced public/openapi.yaml + public/openapi.json from openapi.yaml");
+	} catch (err) {
+		console.error("Failed to sync OpenAPI JSON:", err?.message ?? err);
+	}
+}
+
 async function main() {
 	await buildSharedUi();
 
@@ -180,6 +197,7 @@ async function main() {
 	const manifests = await gatherManifests();
 	mkdirSync(publicDir, { recursive: true });
 	writeFileSync(join(publicDir, "tools-manifest.json"), JSON.stringify(manifests, null, 2));
+	await syncOpenApi();
 	console.log("Build complete. Built " + toolNames.length + " tool(s).");
 }
 

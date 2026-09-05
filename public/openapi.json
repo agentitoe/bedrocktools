@@ -1,138 +1,96 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "BedrockTools — Addon Converter API",
+    "title": "BedrockTools — Addon Converter",
     "version": "1.0.0",
-    "summary": "API para convertir .mcpack/.mcaddon activando logros (product_type=addon)",
-    "description": "Cloudflare Pages Functions API que replica server-side la lógica de `src/tools/addon-converter/index.ts`.\n\n**Qué hace:** descomprime el ZIP, detecta `manifest.json` de *behavior packs* (`modules[].type === \"data\"` o `header.module_type === \"data\"`), y añade `metadata.product_type = \"addon\"` para activar logros en Xbox/Bedrock. Soporta `.mcpack` anidados dentro de `.mcaddon`.\n\n**Runtime:** Cloudflare Pages Functions (`/functions/api/addon-converter.ts` → `/api/addon-converter`). Implementa `onRequestGet` / `onRequestPost` / `onRequestOptions` / `onRequest` según https://developers.cloudflare.com/pages/functions/api-reference/ con routing https://developers.cloudflare.com/pages/functions/routing/.\n\n**Límites:** 30 MB (`MAX_FILE_SIZE = 30 * 1024 * 1024` igual que el frontend `public/tools/addon-converter/index.html`). CORS abierto (`Access-Control-Allow-Origin: *` o `Origin`).",
+    "summary": "Sube tu .mcaddon y juega con logros en Xbox / Upload your .mcaddon and play with achievements on Xbox",
+    "description": "Sube tu .mcaddon y te lo devolvemos listo para usar con logros en Xbox.\nUpload your .mcaddon and get it back ready to use with achievements on Xbox.\n\nUsa POST con multipart (recomendado) o JSON con base64 (para bots).\nUse POST with multipart (recommended) or JSON with base64 (for bots).\n\nLímite: 30 MB. Docs: /api-docs/. CORS open.",
     "contact": {
       "name": "BedrockTools",
       "url": "https://github.com/agentitoe/bedrocktools"
     },
     "license": {
-      "name": "MIT",
+      "name": "GPL-3.0-only",
       "url": "https://github.com/agentitoe/bedrocktools/blob/main/LICENSE"
     }
   },
   "servers": [
     {
       "url": "https://bedrocktools.pages.dev",
-      "description": "Producción (Pages)"
+      "description": "Production"
     },
     {
       "url": "http://localhost:8788",
-      "description": "Local (wrangler pages dev public)"
+      "description": "Local"
     }
   ],
   "tags": [
     {
       "name": "Addon Converter",
-      "description": "Conversión de packs para Bedrock"
+      "description": "Convierte addons para Bedrock / Convert addons for Bedrock"
     }
   ],
-  "externalDocs": {
-    "description": "Guía Cloudflare Pages Functions",
-    "url": "https://developers.cloudflare.com/pages/functions/"
-  },
   "paths": {
     "/api/addon-converter": {
       "get": {
         "tags": [
           "Addon Converter"
         ],
-        "summary": "Health-check y documentación inline",
-        "description": "Retorna la misma info que `onRequestGet` en `functions/api/addon-converter.ts:179`. Útil para verificar que la Function está desplegada y para descubrir ejemplos.",
+        "summary": "Ayuda de la API (ES/EN según Accept-Language)",
+        "description": "Devuelve una ayuda corta y humana. Idioma según `Accept-Language`: `es` → español, resto → inglés.\nReturns a short human-friendly help object. Language from `Accept-Language`: `es` → Spanish, everything else → English.",
         "operationId": "getAddonConverterDocs",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": false,
+            "description": "es → español, resto → inglés / es → Spanish, rest → English",
+            "schema": {
+              "type": "string",
+              "example": "es"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Documentación de la API (JSON)",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "$ref": "#/components/headers/CorsOrigin"
-              },
-              "Access-Control-Allow-Methods": {
-                "$ref": "#/components/headers/CorsMethods"
-              },
-              "Access-Control-Allow-Headers": {
-                "$ref": "#/components/headers/CorsHeaders"
-              },
-              "Vary": {
-                "$ref": "#/components/headers/Vary"
-              }
-            },
+            "description": "Ayuda bilingüe / Bilingual help",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GetDocsResponse"
                 },
-                "example": {
-                  "name": "Addon Converter API",
-                  "description": "Convierte archivos .mcpack/.mcaddon para activar logros (product_type=addon). Equivalente server-side de src/tools/addon-converter/index.ts",
-                  "version": "1.0.0",
-                  "route": "/api/addon-converter",
-                  "methods": [
-                    "GET",
-                    "POST",
-                    "OPTIONS"
-                  ],
-                  "limits": {
-                    "maxFileSize": "30 MB",
-                    "allowedExtensions": [
-                      ".mcpack",
-                      ".mcaddon",
-                      ".zip"
-                    ],
-                    "contentTypes": [
-                      "multipart/form-data",
-                      "application/zip",
-                      "application/octet-stream",
-                      "application/json (base64)"
-                    ]
+                "examples": {
+                  "spanish": {
+                    "summary": "Español (Accept-Language es)",
+                    "value": {
+                      "name": "Addon Converter",
+                      "whatFor": "Sube tu .mcaddon y te lo devolvemos listo para usar con logros en Xbox.",
+                      "usage": {
+                        "multipart": "POST multipart/form-data con campo \"file\" (recomendado).",
+                        "json": "POST application/json con {\"file\": \"<base64>\", \"filename\": \"addon.mcaddon\"} (para bots)."
+                      },
+                      "limits": {
+                        "maxSize": "30 MB"
+                      },
+                      "exampleCurl": "curl -X POST https://bedrocktools.pages.dev/api/addon-converter -F \"file=@addon.mcaddon\" --output converted.mcaddon",
+                      "docs": "/api-docs/"
+                    }
                   },
-                  "get": {
-                    "description": "Retorna esta documentación. Útil como health-check.",
-                    "response": "application/json",
-                    "example": "curl https://bedrocktools.pages.dev/api/addon-converter"
-                  },
-                  "post": {
-                    "description": "Convierte un pack. Añade metadata.product_type='addon' a los manifest.json de behavior packs (type=data).",
-                    "consumes": [
-                      {
-                        "type": "multipart/form-data",
-                        "field": "file",
-                        "example": "curl -X POST https://bedrocktools.pages.dev/api/addon-converter -F \"file=@addon.mcaddon\" --output converted.mcaddon"
+                  "english": {
+                    "summary": "English (default)",
+                    "value": {
+                      "name": "Addon Converter",
+                      "whatFor": "Upload your .mcaddon and get it back ready to use with achievements on Xbox.",
+                      "usage": {
+                        "multipart": "POST multipart/form-data with field \"file\" (recommended).",
+                        "json": "POST application/json with {\"file\": \"<base64>\", \"filename\": \"addon.mcaddon\"} (for bots)."
                       },
-                      {
-                        "type": "application/zip / application/octet-stream (raw body)",
-                        "example": "curl -X POST https://bedrocktools.pages.dev/api/addon-converter --data-binary @addon.mcaddon -H \"Content-Type: application/zip\" --output converted.mcaddon"
+                      "limits": {
+                        "maxSize": "30 MB"
                       },
-                      {
-                        "type": "application/json (base64)",
-                        "body": {
-                          "file": "<base64>",
-                          "filename": "addon.mcaddon (opcional)"
-                        },
-                        "example": "curl -X POST https://bedrocktools.pages.dev/api/addon-converter -H \"Content-Type: application/json\" -d '{\"file\":\"<base64>\",\"filename\":\"addon.mcaddon\"}' --output converted.mcaddon"
-                      }
-                    ],
-                    "queryParams": {
-                      "filename": "opcional, nombre para el archivo de salida cuando se envía raw body (ej: ?filename=pack.mcaddon)"
-                    },
-                    "success": {
-                      "status": 200,
-                      "headers": {
-                        "Content-Type": "application/zip",
-                        "Content-Disposition": "attachment; filename=\"*_MODIFIED.mcaddon\"",
-                        "X-Addon-Converter": "product_type=addon"
-                      },
-                      "body": "binary zip"
-                    },
-                    "errors": {
-                      "400": "Falta archivo, zip inválido o JSON mal formado",
-                      "405": "Método no permitido",
-                      "413": "Archivo supera 30 MB"
-                    },
-                    "jsExample": "const fd = new FormData();\nfd.append('file', file);\nconst res = await fetch('/api/addon-converter', { method: 'POST', body: fd });\nif (!res.ok) throw new Error(await res.text());\nconst blob = await res.blob();"
+                      "exampleCurl": "curl -X POST https://bedrocktools.pages.dev/api/addon-converter -F \"file=@addon.mcaddon\" --output converted.mcaddon",
+                      "docs": "/api-docs/"
+                    }
                   }
                 }
               }
@@ -144,42 +102,24 @@
         "tags": [
           "Addon Converter"
         ],
-        "summary": "Convertir pack (.mcpack / .mcaddon / .zip)",
-        "description": "Descomprime con `fflate:unzipSync`, recorre entradas normalizando path (`src/shared/path.ts:1`), si `p.toLowerCase().endsWith(\".mcpack\")` reprocesa recursivo, si `manifest.json` y `isBehaviorPack()` → `updateManifest()` (`src/shared/encoding.ts` + `src/shared/json.ts`). Re-empaqueta con `zipSync({level:6})`.\n\n**Validación:** early 413 si `content-length > 30 MB`, también tras leer body. Extensiones permitidas `[\".mcpack\",\".mcaddon\",\".zip\"]` solo generan warning header, no bloquean.",
+        "summary": "Convierte tu pack (.mcpack / .mcaddon / .zip)",
+        "description": "Sube tu .mcaddon y te lo devolvemos listo para usar con logros en Xbox.\nUpload your .mcaddon and get it back ready to use with achievements on Xbox.\n\nDos formas:\n1. multipart con campo `file` (recomendado).\n2. JSON con `{\"file\": \"<base64>\", \"filename\": \"addon.mcaddon\"}` (para bots).\nPara cuerpo binario directo (raw) puedes pasar `?filename=pack.mcaddon`.",
         "operationId": "convertAddon",
         "parameters": [
           {
             "name": "filename",
             "in": "query",
             "required": false,
-            "description": "Nombre deseado para el archivo de salida cuando se envía raw body. También se acepta `?name=` o `?file=`. Si no se envía, se lee `Content-Disposition: filename` o se usa `converted.mcaddon`.",
+            "description": "Nombre para el archivo de salida cuando envías cuerpo binario directo / Output name when sending raw binary body",
             "schema": {
               "type": "string",
               "example": "addon.mcaddon"
-            }
-          },
-          {
-            "name": "name",
-            "in": "query",
-            "required": false,
-            "description": "Alias de `filename`.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "file",
-            "in": "query",
-            "required": false,
-            "description": "Alias de `filename`.",
-            "schema": {
-              "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
-          "description": "Un archivo ZIP/MCPACK/MCADDON. 3 formas soportadas (ver `onRequestPost` en `functions/api/addon-converter.ts:256`).",
+          "description": "Tu archivo .mcpack / .mcaddon / .zip",
           "content": {
             "multipart/form-data": {
               "schema": {
@@ -191,13 +131,16 @@
                   "file": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Archivo .mcpack / .mcaddon / .zip (campo `file`; también acepta `pack` o `addon` o primer File)"
+                    "description": "Tu archivo .mcaddon (campo \"file\")"
                   }
                 }
               },
-              "encoding": {
-                "file": {
-                  "contentType": "application/zip, application/octet-stream, application/x-zip-compressed"
+              "examples": {
+                "curl": {
+                  "summary": "Recomendado / Recommended",
+                  "value": {
+                    "file": "addon.mcaddon"
+                  }
                 }
               }
             },
@@ -205,19 +148,14 @@
               "schema": {
                 "type": "string",
                 "format": "binary",
-                "description": "Body binario crudo (.mcpack/.mcaddon/.zip)"
+                "description": "Cuerpo binario directo. Usa ?filename= para el nombre / Raw binary body. Use ?filename= for the name"
               }
             },
             "application/octet-stream": {
               "schema": {
                 "type": "string",
-                "format": "binary"
-              }
-            },
-            "application/x-zip-compressed": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
+                "format": "binary",
+                "description": "Cuerpo binario directo. Usa ?filename= para el nombre / Raw binary body. Use ?filename= for the name"
               }
             },
             "application/json": {
@@ -225,17 +163,10 @@
                 "$ref": "#/components/schemas/JsonBase64Request"
               },
               "examples": {
-                "simple": {
-                  "summary": "JSON con base64",
+                "bot": {
+                  "summary": "Para bots / For bots",
                   "value": {
                     "file": "UEsDBBQACAgIA...",
-                    "filename": "addon.mcaddon"
-                  }
-                },
-                "dataUri": {
-                  "summary": "Data URI",
-                  "value": {
-                    "file": "data:application/zip;base64,UEsDBBQACAgI...",
                     "filename": "addon.mcaddon"
                   }
                 }
@@ -245,31 +176,16 @@
         },
         "responses": {
           "200": {
-            "description": "ZIP convertido. Nombre salida `base_MODIFIED.ext` (igual que frontend `public/tools/addon-converter/index.html:427`).",
+            "description": "Tu archivo listo para usar / Your file ready to use",
             "headers": {
-              "Access-Control-Allow-Origin": {
-                "$ref": "#/components/headers/CorsOrigin"
-              },
-              "Vary": {
-                "$ref": "#/components/headers/Vary"
-              },
               "Content-Disposition": {
                 "$ref": "#/components/headers/ContentDisposition"
-              },
-              "Content-Length": {
-                "$ref": "#/components/headers/ContentLength"
-              },
-              "X-Addon-Converter": {
-                "$ref": "#/components/headers/XAddonConverter"
               },
               "X-Addon-Modified": {
                 "$ref": "#/components/headers/XAddonModified"
               },
               "X-Addon-Warning": {
                 "$ref": "#/components/headers/XAddonWarning"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControl"
               }
             },
             "content": {
@@ -288,12 +204,7 @@
             }
           },
           "400": {
-            "description": "Falta archivo, body vacío, JSON mal formado, base64 inválido o ZIP corrupto",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "$ref": "#/components/headers/CorsOrigin"
-              }
-            },
+            "description": "Falta archivo, archivo vacío, JSON/base64 no válido o archivo dañado / Missing/empty file, invalid JSON/base64 or damaged file",
             "content": {
               "application/json": {
                 "schema": {
@@ -301,33 +212,48 @@
                 },
                 "examples": {
                   "missingFile": {
-                    "summary": "Falta campo file (multipart)",
+                    "summary": "Falta archivo / Missing file",
                     "value": {
-                      "error": "Bad Request",
-                      "message": "Campo 'file' requerido. Usa multipart/form-data con file=@tu.mcaddon"
+                      "error": "Missing file",
+                      "code": "MISSING_FILE",
+                      "message": "Upload a .mcpack/.mcaddon/.zip file",
+                      "messageEs": "Sube un archivo .mcpack/.mcaddon/.zip"
                     }
                   },
-                  "emptyBody": {
-                    "summary": "Body vacío (raw)",
+                  "emptyFile": {
+                    "summary": "Archivo vacío / Empty file",
                     "value": {
-                      "error": "Bad Request",
-                      "message": "Falta archivo. Envía multipart/form-data con campo 'file' o body binario con Content-Type: application/zip.",
-                      "hint": "curl -F \"file=@addon.mcaddon\" /api/addon-converter"
+                      "error": "Empty file",
+                      "code": "EMPTY_FILE",
+                      "message": "The file is empty. Upload a valid .mcpack/.mcaddon/.zip file",
+                      "messageEs": "El archivo está vacío. Sube un archivo .mcpack/.mcaddon/.zip válido"
                     }
                   },
                   "invalidJson": {
-                    "summary": "JSON inválido",
+                    "summary": "JSON no válido / Invalid JSON",
                     "value": {
-                      "error": "Bad Request",
-                      "message": "JSON debe contener {\"file\": \"<base64>\"}."
+                      "error": "Invalid JSON",
+                      "code": "INVALID_JSON",
+                      "message": "Invalid JSON. Send {\"file\": \"<base64>\"}",
+                      "messageEs": "JSON no válido. Envía {\"file\": \"<base64>\"}"
                     }
                   },
-                  "corruptZip": {
-                    "summary": "ZIP corrupto",
+                  "invalidBase64": {
+                    "summary": "Base64 no válido / Invalid base64",
                     "value": {
-                      "error": "Unprocessable Entity",
-                      "message": "Archivo zip inválido o corrupto. Asegúrate de subir un .mcpack/.mcaddon/.zip válido.",
-                      "details": "invalid zip data"
+                      "error": "Invalid base64",
+                      "code": "INVALID_BASE64",
+                      "message": "Invalid base64 data",
+                      "messageEs": "Datos base64 no válidos"
+                    }
+                  },
+                  "invalidZip": {
+                    "summary": "Archivo dañado / Damaged file",
+                    "value": {
+                      "error": "Invalid ZIP",
+                      "code": "INVALID_ZIP",
+                      "message": "Invalid or corrupted file. Upload a valid .mcpack/.mcaddon/.zip file",
+                      "messageEs": "Archivo no válido o dañado. Sube un archivo .mcpack/.mcaddon/.zip válido"
                     }
                   }
                 }
@@ -335,78 +261,34 @@
             }
           },
           "405": {
-            "description": "Método no permitido (solo GET/POST/OPTIONS)",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "$ref": "#/components/headers/CorsOrigin"
-              },
-              "Allow": {
-                "$ref": "#/components/headers/Allow"
-              }
-            },
+            "description": "Método no permitido / Method not allowed",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 },
                 "example": {
-                  "error": "Method Not Allowed",
-                  "message": "Método DELETE no soportado. Usa GET, POST u OPTIONS en /api/addon-converter.",
-                  "allowed": [
-                    "GET",
-                    "POST",
-                    "OPTIONS"
-                  ]
+                  "error": "Method not allowed",
+                  "code": "METHOD_NOT_ALLOWED",
+                  "message": "Method DELETE not allowed. Use GET or POST",
+                  "messageEs": "Método DELETE no permitido. Usa GET o POST"
                 }
               }
             }
           },
           "413": {
-            "description": "Payload Too Large (>30 MB)",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "$ref": "#/components/headers/CorsOrigin"
-              }
-            },
+            "description": "Archivo muy grande (>30 MB) / File too large (>30 MB)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 },
                 "example": {
-                  "error": "Payload Too Large",
-                  "message": "El archivo supera el tamaño máximo permitido (30 MB).",
-                  "maxBytes": 31457280
+                  "error": "File too large",
+                  "code": "TOO_LARGE",
+                  "message": "File is larger than 30 MB",
+                  "messageEs": "El archivo supera los 30 MB"
                 }
-              }
-            }
-          }
-        }
-      },
-      "options": {
-        "tags": [
-          "Addon Converter"
-        ],
-        "summary": "CORS preflight",
-        "operationId": "optionsAddonConverter",
-        "responses": {
-          "204": {
-            "description": "No Content (CORS OK)",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "$ref": "#/components/headers/CorsOrigin"
-              },
-              "Access-Control-Allow-Methods": {
-                "$ref": "#/components/headers/CorsMethods"
-              },
-              "Access-Control-Allow-Headers": {
-                "$ref": "#/components/headers/CorsHeaders"
-              },
-              "Access-Control-Max-Age": {
-                "$ref": "#/components/headers/CorsMaxAge"
-              },
-              "Vary": {
-                "$ref": "#/components/headers/Vary"
               }
             }
           }
@@ -416,70 +298,15 @@
   },
   "components": {
     "headers": {
-      "CorsOrigin": {
-        "description": "CORS origin reflejado o `*`",
-        "schema": {
-          "type": "string",
-          "example": "*"
-        }
-      },
-      "CorsMethods": {
-        "description": "Métodos permitidos",
-        "schema": {
-          "type": "string",
-          "example": "GET, POST, OPTIONS"
-        }
-      },
-      "CorsHeaders": {
-        "description": "Headers permitidos",
-        "schema": {
-          "type": "string",
-          "example": "Content-Type, Content-Disposition, Authorization"
-        }
-      },
-      "CorsMaxAge": {
-        "description": "Cache preflight",
-        "schema": {
-          "type": "string",
-          "example": "86400"
-        }
-      },
-      "Vary": {
-        "description": "Vary",
-        "schema": {
-          "type": "string",
-          "example": "Origin"
-        }
-      },
-      "Allow": {
-        "description": "Allow",
-        "schema": {
-          "type": "string",
-          "example": "GET, POST, OPTIONS"
-        }
-      },
       "ContentDisposition": {
-        "description": "Attachment con nombre `_MODIFIED`",
+        "description": "Descarga con nombre listo / Download with ready name",
         "schema": {
           "type": "string",
           "example": "attachment; filename=\"myPack_MODIFIED.mcaddon\""
         }
       },
-      "ContentLength": {
-        "schema": {
-          "type": "integer",
-          "example": 451
-        }
-      },
-      "XAddonConverter": {
-        "description": "Marca de conversión",
-        "schema": {
-          "type": "string",
-          "example": "product_type=addon"
-        }
-      },
       "XAddonModified": {
-        "description": "Si se encontró y modificó algún manifest behavior",
+        "description": "true si tu pack quedó listo, false si venía sin cambios / true if your pack is ready, false if unchanged",
         "schema": {
           "type": "string",
           "enum": [
@@ -490,16 +317,10 @@
         }
       },
       "XAddonWarning": {
-        "description": "Warning si no hubo behavior pack o extensión no estándar",
+        "description": "Aviso humano solo si no había nada que convertir / Human notice only if there was nothing to convert",
         "schema": {
           "type": "string",
-          "example": "no behavior pack manifest found; file returned unchanged except re-zip"
-        }
-      },
-      "CacheControl": {
-        "schema": {
-          "type": "string",
-          "example": "no-store"
+          "example": "No behavior pack found, file returned as-is"
         }
       }
     },
@@ -508,43 +329,35 @@
         "type": "object",
         "required": [
           "error",
-          "message"
+          "code",
+          "message",
+          "messageEs"
         ],
         "properties": {
           "error": {
             "type": "string",
-            "example": "Bad Request"
+            "example": "Missing file"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "MISSING_FILE",
+              "EMPTY_FILE",
+              "INVALID_JSON",
+              "INVALID_BASE64",
+              "INVALID_ZIP",
+              "TOO_LARGE",
+              "METHOD_NOT_ALLOWED"
+            ],
+            "example": "MISSING_FILE"
           },
           "message": {
             "type": "string",
-            "example": "Campo 'file' requerido. Usa multipart/form-data con file=@tu.mcaddon"
+            "example": "Upload a .mcpack/.mcaddon/.zip file"
           },
-          "details": {
+          "messageEs": {
             "type": "string",
-            "nullable": true,
-            "example": "invalid zip data"
-          },
-          "hint": {
-            "type": "string",
-            "nullable": true,
-            "example": "curl -F \"file=@addon.mcaddon\" /api/addon-converter"
-          },
-          "maxBytes": {
-            "type": "integer",
-            "nullable": true,
-            "example": 31457280
-          },
-          "allowed": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true,
-            "example": [
-              "GET",
-              "POST",
-              "OPTIONS"
-            ]
+            "example": "Sube un archivo .mcpack/.mcaddon/.zip"
           }
         }
       },
@@ -553,99 +366,76 @@
         "required": [
           "file"
         ],
-        "description": "Alternativa JSON para entornos sin multipart (ej. server-to-server). `file` es base64 puro o data URI `data:application/zip;base64,...`.",
+        "description": "Para bots sin multipart / For bots without multipart",
         "properties": {
           "file": {
             "type": "string",
             "format": "byte",
-            "description": "Contenido del ZIP en base64",
+            "description": "Tu archivo en base64 / Your file in base64",
             "example": "UEsDBBQACAgIA..."
-          },
-          "data": {
-            "type": "string",
-            "format": "byte",
-            "description": "Alias de `file`"
-          },
-          "base64": {
-            "type": "string",
-            "format": "byte",
-            "description": "Alias de `file`"
           },
           "filename": {
             "type": "string",
-            "description": "Nombre original (para derivar `_MODIFIED`)",
+            "description": "Nombre original / Original name",
             "example": "addon.mcaddon"
-          },
-          "name": {
-            "type": "string",
-            "description": "Alias de `filename`"
-          },
-          "fileName": {
-            "type": "string",
-            "description": "Alias de `filename`"
           }
         }
       },
       "GetDocsResponse": {
         "type": "object",
+        "required": [
+          "name",
+          "whatFor",
+          "usage",
+          "limits",
+          "exampleCurl",
+          "docs"
+        ],
         "properties": {
           "name": {
             "type": "string",
-            "example": "Addon Converter API"
+            "example": "Addon Converter"
           },
-          "description": {
-            "type": "string"
-          },
-          "version": {
+          "whatFor": {
             "type": "string",
-            "example": "1.0.0"
+            "example": "Upload your .mcaddon and get it back ready to use with achievements on Xbox."
           },
-          "route": {
-            "type": "string",
-            "example": "/api/addon-converter"
-          },
-          "methods": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "GET",
-              "POST",
-              "OPTIONS"
-            ]
-          },
-          "limits": {
+          "usage": {
             "type": "object",
+            "required": [
+              "multipart",
+              "json"
+            ],
             "properties": {
-              "maxFileSize": {
+              "multipart": {
                 "type": "string",
-                "example": "30 MB"
+                "example": "POST multipart/form-data with field \"file\" (recommended)."
               },
-              "allowedExtensions": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "example": [
-                  ".mcpack",
-                  ".mcaddon",
-                  ".zip"
-                ]
-              },
-              "contentTypes": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
+              "json": {
+                "type": "string",
+                "example": "POST application/json with {\"file\": \"<base64>\", \"filename\": \"addon.mcaddon\"} (for bots)."
               }
             }
           },
-          "get": {
-            "type": "object"
+          "limits": {
+            "type": "object",
+            "required": [
+              "maxSize"
+            ],
+            "properties": {
+              "maxSize": {
+                "type": "string",
+                "example": "30 MB"
+              }
+            }
           },
-          "post": {
-            "type": "object"
+          "exampleCurl": {
+            "type": "string",
+            "example": "curl -X POST https://bedrocktools.pages.dev/api/addon-converter -F \"file=@addon.mcaddon\" --output converted.mcaddon"
+          },
+          "docs": {
+            "type": "string",
+            "example": "/api-docs/"
           }
         }
       }

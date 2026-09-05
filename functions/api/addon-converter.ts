@@ -1,15 +1,8 @@
 /**
- * Cloudflare Pages Function: POST /api/addon-converter
- * Guía seguida: https://developers.cloudflare.com/pages/functions/ (file-based routing, onRequest* API)
+ * Addon Converter API: POST /api/addon-converter
  *
- * Ruta generada por file-based routing:
- *   /functions/api/addon-converter.ts  ->  /api/addon-converter
- *
- * Métodos implementados (API reference):
- *   - onRequestGet     -> documentación JSON + health check
- *   - onRequestPost    -> conversión de .mcpack/.mcaddon/.zip
- *   - onRequestOptions -> CORS preflight
- *   - onRequest        -> 405 para verbos no permitidos
+ * Sube tu .mcaddon y te lo devolvemos listo para usar con logros en Xbox.
+ * Upload your .mcaddon and get it back ready to use with achievements on Xbox.
  */
 
 import { unzipSync, zipSync } from "fflate";
@@ -17,11 +10,11 @@ import { unzipSync, zipSync } from "fflate";
 // ------------------------------------------------------------
 // Config
 // ------------------------------------------------------------
-const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB igual que el frontend: src/tools/addon-converter (public/tools/addon-converter/index.html:415)
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
 const ALLOWED_EXTS = [".mcpack", ".mcaddon", ".zip"];
 
 // ------------------------------------------------------------
-// Shared helpers (copias de src/shared/* para no depender de bundling cross-folder)
+// Shared helpers
 // ------------------------------------------------------------
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -39,7 +32,7 @@ function encodeUtf8(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
-/** Zip-Slip guard (mirror of src/shared/path.ts): null = reject entry. */
+/** Zip-Slip guard: null = reject entry. */
 function sanitizeZipPath(rawPath: string): string | null {
   if (rawPath.indexOf("\0") !== -1) return null;
   const p = normalizePath(rawPath);
@@ -112,7 +105,7 @@ function stripJsonComments(text: string): string {
 }
 
 // ------------------------------------------------------------
-// Lógica de conversión (src/tools/addon-converter/index.ts:6-71)
+// Conversion logic
 // ------------------------------------------------------------
 function isBehaviorPack(manifestText: string): boolean {
   const cleaned = stripJsonComments(manifestText);
@@ -158,7 +151,7 @@ async function processPack(data: Uint8Array): Promise<Uint8Array> {
   const toZip: Record<string, Uint8Array> = {};
   for (const [path, content] of Object.entries(raw)) {
     if (path.endsWith("/")) continue;
-    // Drop Zip-Slip / absolute entries instead of re-emitting them.
+    // Drop unsafe / absolute entries instead of re-emitting them.
     const p = sanitizeZipPath(path);
     if (p === null) continue;
     if (p.toLowerCase().endsWith(".mcpack")) {
@@ -179,7 +172,7 @@ async function processPack(data: Uint8Array): Promise<Uint8Array> {
 }
 
 // ------------------------------------------------------------
-// CORS & response helpers (Pages Functions ejecuta en Cloudflare Workers)
+// CORS & response helpers
 // ------------------------------------------------------------
 function corsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("Origin") || "*";
@@ -205,101 +198,129 @@ function jsonResponse(data: unknown, status: number, cors: Record<string, string
 }
 
 // ------------------------------------------------------------
-// GET /api/addon-converter  -> documentación
+// Language + bilingual errors
+// ------------------------------------------------------------
+function prefersSpanish(request: Request): boolean {
+  const header = request.headers.get("accept-language") || "";
+  const first = header.split(",")[0]?.split(";")[0]?.trim().toLowerCase() ?? "";
+  return first === "es" || first.startsWith("es-") || first.startsWith("es;");
+}
+
+type ErrorCode =
+  | "MISSING_FILE"
+  | "EMPTY_FILE"
+  | "INVALID_JSON"
+  | "INVALID_BASE64"
+  | "INVALID_ZIP"
+  | "TOO_LARGE"
+  | "METHOD_NOT_ALLOWED";
+
+const ERROR_TEXTS: Record<ErrorCode, { error: string; message: string; messageEs: string; status: number }> = {
+  MISSING_FILE: {
+    error: "Missing file",
+    message: "Upload a .mcpack/.mcaddon/.zip file",
+    messageEs: "Sube un archivo .mcpack/.mcaddon/.zip",
+    status: 400,
+  },
+  EMPTY_FILE: {
+    error: "Empty file",
+    message: "The file is empty. Upload a valid .mcpack/.mcaddon/.zip file",
+    messageEs: "El archivo está vacío. Sube un archivo .mcpack/.mcaddon/.zip válido",
+    status: 400,
+  },
+  INVALID_JSON: {
+    error: "Invalid JSON",
+    message: 'Invalid JSON. Send {"file": "<base64>"}',
+    messageEs: 'JSON no válido. Envía {"file": "<base64>"}',
+    status: 400,
+  },
+  INVALID_BASE64: {
+    error: "Invalid base64",
+    message: "Invalid base64 data",
+    messageEs: "Datos base64 no válidos",
+    status: 400,
+  },
+  INVALID_ZIP: {
+    error: "Invalid ZIP",
+    message: "Invalid or corrupted file. Upload a valid .mcpack/.mcaddon/.zip file",
+    messageEs: "Archivo no válido o dañado. Sube un archivo .mcpack/.mcaddon/.zip válido",
+    status: 400,
+  },
+  TOO_LARGE: {
+    error: "File too large",
+    message: "File is larger than 30 MB",
+    messageEs: "El archivo supera los 30 MB",
+    status: 413,
+  },
+  METHOD_NOT_ALLOWED: {
+    error: "Method not allowed",
+    message: "Method not allowed. Use GET or POST",
+    messageEs: "Método no permitido. Usa GET o POST",
+    status: 405,
+  },
+};
+
+function errorResponse(code: ErrorCode, cors: Record<string, string>, method?: string, extraHeaders: Record<string, string> = {}): Response {
+  const t = ERROR_TEXTS[code];
+  const body =
+    code === "METHOD_NOT_ALLOWED" && method
+      ? {
+          error: t.error,
+          code,
+          message: `Method ${method} not allowed. Use GET or POST`,
+          messageEs: `Método ${method} no permitido. Usa GET o POST`,
+        }
+      : { error: t.error, code, message: t.message, messageEs: t.messageEs };
+  return jsonResponse(body, t.status, cors, extraHeaders);
+}
+
+// ------------------------------------------------------------
+// GET /api/addon-converter -> human-friendly docs
 // ------------------------------------------------------------
 export async function onRequestGet(context: { request: Request }) {
   const cors = corsHeaders(context.request);
   const url = new URL(context.request.url);
   const base = `${url.protocol}//${url.host}`;
+  const es = prefersSpanish(context.request);
 
-  const docs = {
-    name: "Addon Converter API",
-    description: "Convierte archivos .mcpack/.mcaddon para activar logros (product_type=addon). Equivalente server-side de src/tools/addon-converter/index.ts",
-    version: "1.0.0",
-    route: "/api/addon-converter",
-    methods: ["GET", "POST", "OPTIONS"],
-    limits: {
-      maxFileSize: `${MAX_FILE_SIZE / (1024 * 1024)} MB`,
-      allowedExtensions: ALLOWED_EXTS,
-      contentTypes: ["multipart/form-data", "application/zip", "application/octet-stream", "application/json (base64)"],
-    },
-    get: {
-      description: "Retorna esta documentación. Útil como health-check.",
-      response: "application/json",
-      example: `curl ${base}/api/addon-converter`,
-    },
-    post: {
-      description: "Convierte un pack. Añade metadata.product_type='addon' a los manifest.json de behavior packs (type=data).",
-      consumes: [
-        {
-          type: "multipart/form-data",
-          field: "file",
-          example: `curl -X POST ${base}/api/addon-converter -F "file=@addon.mcaddon" --output converted.mcaddon`,
+  const docs = es
+    ? {
+        name: "Addon Converter",
+        whatFor: "Sube tu .mcaddon y te lo devolvemos listo para usar con logros en Xbox.",
+        usage: {
+          multipart: 'POST multipart/form-data con campo "file" (recomendado).',
+          json: 'POST application/json con {"file": "<base64>", "filename": "addon.mcaddon"} (para bots).',
         },
-        {
-          type: "application/zip / application/octet-stream (raw body)",
-          example: `curl -X POST ${base}/api/addon-converter --data-binary @addon.mcaddon -H "Content-Type: application/zip" --output converted.mcaddon`,
+        limits: { maxSize: "30 MB" },
+        exampleCurl: `curl -X POST ${base}/api/addon-converter -F "file=@addon.mcaddon" --output converted.mcaddon`,
+        docs: "/api-docs/",
+      }
+    : {
+        name: "Addon Converter",
+        whatFor: "Upload your .mcaddon and get it back ready to use with achievements on Xbox.",
+        usage: {
+          multipart: 'POST multipart/form-data with field "file" (recommended).',
+          json: 'POST application/json with {"file": "<base64>", "filename": "addon.mcaddon"} (for bots).',
         },
-        {
-          type: "application/json (base64)",
-          body: { file: "<base64>", filename: "addon.mcaddon (opcional)" },
-          example: `curl -X POST ${base}/api/addon-converter -H "Content-Type: application/json" -d '{"file":"<base64>","filename":"addon.mcaddon"}' --output converted.mcaddon`,
-        },
-      ],
-      queryParams: {
-        filename: "opcional, nombre para el archivo de salida cuando se envía raw body (ej: ?filename=pack.mcaddon)",
-      },
-      success: {
-        status: 200,
-        headers: {
-          "Content-Type": "application/zip",
-          "Content-Disposition": 'attachment; filename="*_MODIFIED.mcaddon"',
-          "X-Addon-Converter": "product_type=addon",
-        },
-        body: "binary zip",
-      },
-      errors: {
-        400: "Falta archivo, zip inválido o JSON mal formado",
-        413: "Archivo supera 30 MB",
-        405: "Método no permitido",
-      },
-      jsExample: [
-        "// multipart/form-data (recomendado)",
-        "const fd = new FormData();",
-        "fd.append('file', file); // File de <input type=file>",
-        "const res = await fetch('/api/addon-converter', { method: 'POST', body: fd });",
-        "if (!res.ok) throw new Error(await res.text());",
-        "const blob = await res.blob();",
-        "",
-        "// raw",
-        "const buf = await file.arrayBuffer();",
-        "const res2 = await fetch('/api/addon-converter?filename=' + encodeURIComponent(file.name), { method: 'POST', headers: {'Content-Type':'application/zip'}, body: buf });",
-      ].join("\n"),
-    },
-  };
+        limits: { maxSize: "30 MB" },
+        exampleCurl: `curl -X POST ${base}/api/addon-converter -F "file=@addon.mcaddon" --output converted.mcaddon`,
+        docs: "/api-docs/",
+      };
 
   return jsonResponse(docs, 200, cors);
 }
 
 // ------------------------------------------------------------
-// POST /api/addon-converter -> conversión
+// POST /api/addon-converter -> conversion
 // ------------------------------------------------------------
 export async function onRequestPost(context: { request: Request }) {
   const request = context.request;
   const cors = corsHeaders(request);
 
-  // Early 413 por Content-Length si está presente
+  // Early 413 when Content-Length is present
   const contentLength = request.headers.get("content-length");
   if (contentLength && Number(contentLength) > MAX_FILE_SIZE) {
-    return jsonResponse(
-      {
-        error: "Payload Too Large",
-        message: `El archivo supera el tamaño máximo permitido (${MAX_FILE_SIZE / (1024 * 1024)} MB).`,
-        maxBytes: MAX_FILE_SIZE,
-      },
-      413,
-      cors,
-    );
+    return errorResponse("TOO_LARGE", cors);
   }
 
   let fileBuffer: ArrayBuffer | null = null;
@@ -309,13 +330,11 @@ export async function onRequestPost(context: { request: Request }) {
 
   try {
     if (contentType.includes("multipart/form-data")) {
-      // Workers soporta request.formData() nativo (Pages Functions runtime = Workers)
       const formData = await request.formData();
-      // acepta "file", "pack" o "addon" + primer File encontrado
+      // Compat: "file", "pack", "addon", or first File found
       let fileEntry: FormDataEntryValue | null =
         formData.get("file") ?? formData.get("pack") ?? formData.get("addon") ?? null;
       if (!fileEntry) {
-        // fallback: busca el primer File en el form
         for (const v of formData.values()) {
           if (typeof v !== "string" && v instanceof File) {
             fileEntry = v;
@@ -324,24 +343,16 @@ export async function onRequestPost(context: { request: Request }) {
         }
       }
       if (!fileEntry || typeof fileEntry === "string") {
-        return jsonResponse(
-          { error: "Bad Request", message: "Campo 'file' requerido. Usa multipart/form-data con file=@tu.mcaddon" },
-          400,
-          cors,
-        );
+        return errorResponse("MISSING_FILE", cors);
       }
       const file = fileEntry as unknown as File;
       originalFilename = file.name || originalFilename;
       const buf = await file.arrayBuffer();
       if (buf.byteLength === 0) {
-        return jsonResponse({ error: "Bad Request", message: "Archivo vacío." }, 400, cors);
+        return errorResponse("EMPTY_FILE", cors);
       }
       if (buf.byteLength > MAX_FILE_SIZE) {
-        return jsonResponse(
-          { error: "Payload Too Large", message: `Archivo supera ${MAX_FILE_SIZE / (1024 * 1024)} MB.`, maxBytes: MAX_FILE_SIZE },
-          413,
-          cors,
-        );
+        return errorResponse("TOO_LARGE", cors);
       }
       fileBuffer = buf;
     } else if (contentType.includes("application/json")) {
@@ -349,16 +360,13 @@ export async function onRequestPost(context: { request: Request }) {
       try {
         body = await request.json();
       } catch {
-        return jsonResponse({ error: "Bad Request", message: "JSON inválido." }, 400, cors);
+        return errorResponse("INVALID_JSON", cors);
       }
+      // Compat: file / data / base64 + filename / name / fileName
       const b64 = body.file ?? body.data ?? body.base64 ?? null;
       const filename = body.filename ?? body.name ?? body.fileName ?? null;
       if (!b64 || typeof b64 !== "string") {
-        return jsonResponse(
-          { error: "Bad Request", message: "JSON debe contener {\"file\": \"<base64>\"}." },
-          400,
-          cors,
-        );
+        return errorResponse("MISSING_FILE", cors);
       }
       if (filename && typeof filename === "string") originalFilename = filename;
       // data URI support
@@ -367,22 +375,18 @@ export async function onRequestPost(context: { request: Request }) {
       try {
         binary = Uint8Array.from(atob(cleanB64), (c) => c.charCodeAt(0));
       } catch {
-        return jsonResponse({ error: "Bad Request", message: "Base64 inválido." }, 400, cors);
+        return errorResponse("INVALID_BASE64", cors);
       }
       if (binary.byteLength === 0) {
-        return jsonResponse({ error: "Bad Request", message: "Archivo vacío tras decodificar base64." }, 400, cors);
+        return errorResponse("EMPTY_FILE", cors);
       }
       if (binary.byteLength > MAX_FILE_SIZE) {
-        return jsonResponse(
-          { error: "Payload Too Large", message: `Archivo supera ${MAX_FILE_SIZE / (1024 * 1024)} MB.`, maxBytes: MAX_FILE_SIZE },
-          413,
-          cors,
-        );
+        return errorResponse("TOO_LARGE", cors);
       }
       fileBuffer = binary.buffer.slice(binary.byteOffset, binary.byteOffset + binary.byteLength) as ArrayBuffer;
     } else {
-      // Raw body: application/zip, application/octet-stream, o sin content-type
-      // También acepta application/x-zip-compressed etc.
+      // Raw body: application/zip, application/octet-stream, or no content-type
+      // Compat: ?filename / ?name / ?file + Content-Disposition
       const url = new URL(request.url);
       const qpFilename = url.searchParams.get("filename") || url.searchParams.get("name") || url.searchParams.get("file");
       if (qpFilename) originalFilename = qpFilename;
@@ -399,60 +403,31 @@ export async function onRequestPost(context: { request: Request }) {
         }
       }
 
-      // Si no hay body, error guiado
       const buf = await request.arrayBuffer();
       if (!buf || buf.byteLength === 0) {
-        return jsonResponse(
-          {
-            error: "Bad Request",
-            message: "Falta archivo. Envía multipart/form-data con campo 'file' o body binario con Content-Type: application/zip.",
-            hint: 'curl -F "file=@addon.mcaddon" /api/addon-converter',
-          },
-          400,
-          cors,
-        );
+        return errorResponse("MISSING_FILE", cors);
       }
       if (buf.byteLength > MAX_FILE_SIZE) {
-        return jsonResponse(
-          { error: "Payload Too Large", message: `Archivo supera ${MAX_FILE_SIZE / (1024 * 1024)} MB.`, maxBytes: MAX_FILE_SIZE },
-          413,
-          cors,
-        );
+        return errorResponse("TOO_LARGE", cors);
       }
       fileBuffer = buf;
     }
   } catch (e: any) {
-    return jsonResponse(
-      { error: "Bad Request", message: e?.message || "Error leyendo la petición." },
-      400,
-      cors,
-    );
+    return errorResponse("MISSING_FILE", cors);
   }
 
-  // Validación de extensión (solo warning, no bloqueo)
+  // Extension check (warning only, never blocks)
   const lowerName = originalFilename.toLowerCase();
   const hasAllowedExt = ALLOWED_EXTS.some((ext) => lowerName.endsWith(ext));
-  // no bloqueamos si no coincide, pero lo registramos por si se quiere auditar
+  void hasAllowedExt;
 
-  // Procesamiento
+  // Processing
   let output: Uint8Array;
   let wasModified: boolean = false;
   try {
     const input = new Uint8Array(fileBuffer!);
+    output = await processPack(input);
 
-    // Detección rápida de zip: PK\x03\x04
-    if (input.length < 4 || input[0] !== 0x50 || input[1] !== 0x4b) {
-      // fflate dará error de todas formas, pero damos mensaje más claro
-      // permitimos intentar de todos modos por si es .mcpack sin firma estándar
-    }
-
-    // Guardamos hash simple para detectar si hubo cambio (opcional)
-    // En lugar de hashear, comprobaremos si algún manifest cambió comparando inclusión de product_type
-    const before = input;
-    output = await processPack(before);
-
-    // Heurística: si output !== input length o bytes difieren, asumimos modificación
-    // Para ser exactos, buscamos si el zip resultante contiene product_type
     try {
       const check = unzipSync(output);
       for (const [p, c] of Object.entries(check)) {
@@ -465,23 +440,13 @@ export async function onRequestPost(context: { request: Request }) {
         }
       }
     } catch {
-      wasModified = true; // si no podemos inspeccionar, asumimos que se procesó
+      wasModified = true;
     }
-  } catch (e: any) {
-    const msg = e?.message || String(e);
-    // Mensajes comunes de fflate: invalid zip data
-    return jsonResponse(
-      {
-        error: "Unprocessable Entity",
-        message: "Archivo zip inválido o corrupto. Asegúrate de subir un .mcpack/.mcaddon/.zip válido.",
-        details: msg,
-      },
-      400,
-      cors,
-    );
+  } catch {
+    return errorResponse("INVALID_ZIP", cors);
   }
 
-  // Nombre de salida: base_MODIFIED.ext (igual que frontend: public/tools/addon-converter/index.html:427)
+  // Output name: base_MODIFIED.ext
   const ext = originalFilename.includes(".") ? originalFilename.slice(originalFilename.lastIndexOf(".")) : ".mcaddon";
   const base = originalFilename.slice(0, originalFilename.lastIndexOf(".") !== -1 ? originalFilename.lastIndexOf(".") : originalFilename.length) || "converted";
   const safeBase = base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "converted";
@@ -497,14 +462,12 @@ export async function onRequestPost(context: { request: Request }) {
     "Cache-Control": "no-store",
   };
 
-  if (!hasAllowedExt) {
-    headers["X-Addon-Warning"] = "extension not in .mcpack/.mcaddon/.zip";
-  }
   if (!wasModified) {
-    headers["X-Addon-Warning"] = "no behavior pack manifest found; file returned unchanged except re-zip";
+    headers["X-Addon-Warning"] = prefersSpanish(request)
+      ? "Sin pack de comportamiento, archivo devuelto sin cambios"
+      : "No behavior pack found, file returned as-is";
   }
 
-  // Uint8Array es válido como BodyInit en Workers; cast para compatibilidad con lib DOM
   return new Response(output! as unknown as BodyInit, {
     status: 200,
     headers,
@@ -512,7 +475,7 @@ export async function onRequestPost(context: { request: Request }) {
 }
 
 // ------------------------------------------------------------
-// OPTIONS -> CORS preflight (requerido por Pages Functions)
+// OPTIONS -> CORS preflight (needed for browsers)
 // ------------------------------------------------------------
 export async function onRequestOptions(context: { request: Request }) {
   const cors = corsHeaders(context.request);
@@ -528,26 +491,15 @@ export async function onRequestOptions(context: { request: Request }) {
 }
 
 // ------------------------------------------------------------
-// Fallback para verbos no soportados -> 405
+// Fallback for unsupported verbs -> 405
 // ------------------------------------------------------------
 export async function onRequest(context: { request: Request }) {
   const cors = corsHeaders(context.request);
   const method = context.request.method.toUpperCase();
   if (method === "GET" || method === "POST" || method === "OPTIONS") {
-    // Estos ya tienen handlers específicos; este fallback no debería ejecutarse para ellos,
-    // pero lo dejamos por si el runtime invoca onRequest en lugar de onRequestVerb.
-    // Delegamos:
     if (method === "GET") return onRequestGet(context);
     if (method === "POST") return onRequestPost(context);
     if (method === "OPTIONS") return onRequestOptions(context);
   }
-  return jsonResponse(
-    {
-      error: "Method Not Allowed",
-      message: `Método ${method} no soportado. Usa GET, POST u OPTIONS en /api/addon-converter.`,
-      allowed: ["GET", "POST", "OPTIONS"],
-    },
-    405,
-    { ...cors, Allow: "GET, POST, OPTIONS" },
-  );
+  return errorResponse("METHOD_NOT_ALLOWED", cors, method, { Allow: "GET, POST, OPTIONS" });
 }
