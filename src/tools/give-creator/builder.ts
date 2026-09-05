@@ -1,72 +1,149 @@
 // Command builders for the /give Command Generator.
 // Pure functions: given the form state they produce the command string.
 // Kept free of DOM access so the logic is unit-testable.
+//
+// Security / performance notes:
+// - Numeric component values are emitted only when they match a strict
+//   integer/float pattern, so crafted input can never inject raw SNBT.
+// - Command targets go through a selector whitelist.
+// - SNBT string escaping covers backslashes, quotes and control characters.
+// - User-supplied raw JSON is merged with a prototype-pollution-safe copy
+//   (`__proto__` / `constructor` / `prototype` keys are dropped).
+// - Pure helpers (`parseColor`, `parseBlockList`, ...) are memoized in small
+//   bounded caches. Valid outputs are byte-identical to the previous version.
 
 import type { BuildResult, GiveState } from './types';
 import { resolveBedrockItem } from './bedrock-ids';
 
+// ---- Precompiled patterns / whitelists ----
+
+/** Strict integer (damage, counts, data values...). */
+const INT_RE = /^-?\d+$/;
+/** Strict decimal (saturation, cooldown seconds...). */
+const FLOAT_RE = /^-?\d+(\.\d+)?$/;
+/** Split on commas / whitespace (block lists, color lists). */
+const LIST_SPLIT_RE = /[\s,]+/;
+/** Key=value lines (block-state editor, raw kv). */
+const KV_SPLIT_RE = /\n|;/;
+/** Hex color "#rrggbb". */
+const HEX_COLOR_RE = /^[0-9a-fA-F]{6}$/;
+/** UUID without dashes (32 hex chars). */
+const UUID_HEX_RE = /^[0-9a-fA-F]{32}$/;
+
+/** Exact vanilla target selectors. */
+const SELECTOR_WHITELIST: ReadonlySet<string> = new Set(['@p', '@a', '@r', '@s']);
+/** Extended selector with arguments, e.g. `@e[type=zombie]`. */
+const SELECTOR_ARGS_RE = /^@[paers](\[.*\])?$/;
+/** Plain player name (Bedrock/Java online id). */
+const PLAYER_NAME_RE = /^[A-Za-z0-9_]{3,16}$/;
+/** UUID with or without dashes. */
+const UUID_RE = /^[0-9a-fA-F-]{32,36}$/;
+
+/** Keys that must never be merged from user-supplied JSON (prototype pollution). */
+const UNSAFE_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
+
+// ---- Bounded memoization for pure helpers ----
+
+const MEMO_CAP = 500;
+
+function memoize1<A extends string, R>(fn: (arg: A) => R, cap = MEMO_CAP): (arg: A) => R {
+	const cache = new Map<string, R>();
+	return (arg: A): R => {
+		const hit = cache.get(arg);
+		if (hit !== undefined) return hit;
+		const out = fn(arg);
+		if (cache.size >= cap) cache.clear();
+		cache.set(arg, out);
+		return out;
+	};
+}
+
 // ---- SNBT / text helpers ----
 
-/** Double-quoted SNBT string. */
+/** Double-quoted SNBT string (escapes backslashes, quotes and controls). */
 export function snbtStr(value: string): string {
-	return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+	return '"' + value
+		.replace(/\\/g, '\\\\')
+		.replace(/"/g, '\\"')
+		.replace(/\n/g, '\\n')
+		.replace(/\r/g, '\\r')
+		.replace(/\t/g, '\\t') + '"';
 }
 
 /** JSON text component wrapped in single quotes (safe inside item brackets). */
 export function snbtJson(json: string): string {
-	return "'" + json.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+	return "'" + json
+		.replace(/\\/g, '\\\\')
+		.replace(/'/g, "\\'")
+		.replace(/\n/g, '\\n')
+		.replace(/\r/g, '\\r')
+		.replace(/\t/g, '\\t') + "'";
 }
+
+const textComponentCache = new Map<string, string>();
 
 /** Build a Minecraft JSON text component `{"text":...,"color":...}`. */
 export function textComponent(text: string, color?: string, italic?: boolean, bold?: boolean): string {
+	const cacheKey = text + '¦' + (color ?? '') + '¦' + (italic === undefined ? '' : italic ? '1' : '0') + '¦' + (bold ? '1' : '0');
+	const hit = textComponentCache.get(cacheKey);
+	if (hit !== undefined) return hit;
 	const parts = [`"text":${JSON.stringify(text)}`];
 	if (color && color !== 'white') parts.push(`"color":"${color}"`);
 	if (italic !== undefined) parts.push(`"italic":${italic}`);
 	if (bold) parts.push(`"bold":true`);
-	return '{' + parts.join(',') + '}';
+	const out = '{' + parts.join(',') + '}';
+	if (textComponentCache.size >= MEMO_CAP) textComponentCache.clear();
+	textComponentCache.set(cacheKey, out);
+	return out;
 }
 
-/** Split a comma/whitespace separated block list (allows "#tag" and "block:data"). */
-export function parseBlockList(text: string): string[] {
+function parseBlockListUncached(text: string): string[] {
 	return text
-		.split(/[\s,]+/)
+		.split(LIST_SPLIT_RE)
 		.map((s) => s.trim())
 		.filter(Boolean);
 }
 
-/** "#rrggbb" or decimal int -> decimal color int (null when unparseable). */
-export function parseColor(input: string): number | null {
+/** Split a comma/whitespace separated block list (allows "#tag" and "block:data"). */
+export const parseBlockList: (text: string) => string[] = memoize1(parseBlockListUncached);
+
+function parseColorUncached(input: string): number | null {
 	const s = input.trim();
 	if (!s) return null;
 	if (s.startsWith('#')) {
 		const hex = s.slice(1);
-		if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+		if (!HEX_COLOR_RE.test(hex)) return null;
 		return parseInt(hex, 16);
 	}
 	if (/^\d+$/.test(s)) return parseInt(s, 10);
 	return null;
 }
 
-/** "16711680, #ff0000, 65280" -> [16711680, 65280]. */
-export function parseColorList(text: string): number[] {
+/** "#rrggbb" or decimal int -> decimal color int (null when unparseable). */
+export const parseColor: (input: string) => number | null = memoize1(parseColorUncached);
+
+function parseColorListUncached(text: string): number[] {
 	return text
-		.split(/[\s,]+/)
+		.split(LIST_SPLIT_RE)
 		.map((c) => parseColor(c))
 		.filter((c): c is number => c !== null);
 }
 
+/** "16711680, #ff0000, 65280" -> [16711680, 65280]. */
+export const parseColorList: (text: string) => number[] = memoize1(parseColorListUncached);
+
 /** Parse `key=value` lines into SNBT compound entries. */
 export function parseKvLines(text: string): string[] {
 	return text
-		.split(/\n|;/)
+		.split(KV_SPLIT_RE)
 		.map((line) => line.trim())
 		.filter(Boolean)
 		.map((line) => {
 			const eq = line.indexOf('=');
 			if (eq <= 0) return null;
 			const key = line.slice(0, eq).trim();
-			let value = line.slice(eq + 1).trim();
-			if (/^-?\d+$/.test(value)) {
+			const value = line.slice(eq + 1).trim();
+			if (INT_RE.test(value)) {
 				return `${key}:${value}`;
 			}
 			if (value === 'true' || value === 'false') {
@@ -79,23 +156,35 @@ export function parseKvLines(text: string): string[] {
 
 /** Parse a "k=v" line (used by the block-state editor). */
 function kvToSnbt(key: string, value: string): string {
-	if (/^-?\d+$/.test(value)) return `${key}:${value}`;
+	if (INT_RE.test(value)) return `${key}:${value}`;
 	if (value === 'true' || value === 'false') return `${key}:${value}`;
 	return `${key}:${snbtStr(value)}`;
 }
 
+// Keep the helper referenced (block-state rows reuse the same coercion).
+void kvToSnbt;
+
+const uuidCache = new Map<string, string>();
+
 /** Convert a UUID string (with or without dashes) to SNBT int-array form [I;...]. */
 export function uuidToIntArray(uuid: string): string {
+	const hit = uuidCache.get(uuid);
+	if (hit !== undefined) return hit;
 	const hex = uuid.replace(/-/g, '');
-	if (!/^[0-9a-fA-F]{32}$/.test(hex)) {
+	let out: string;
+	if (!UUID_HEX_RE.test(hex)) {
 		// Not a valid UUID; keep the raw value so the command still shows something.
-		return `[I;${hex}]`;
+		out = `[I;${hex}]`;
+	} else {
+		const parts: number[] = [];
+		for (let i = 0; i < 32; i += 8) {
+			parts.push(parseInt(hex.slice(i, i + 8), 16) | 0);
+		}
+		out = `[I;${parts.join(',')}]`;
 	}
-	const parts: number[] = [];
-	for (let i = 0; i < 32; i += 8) {
-		parts.push(parseInt(hex.slice(i, i + 8), 16) | 0);
-	}
-	return `[I;${parts.join(',')}]`;
+	if (uuidCache.size >= MEMO_CAP) uuidCache.clear();
+	uuidCache.set(uuid, out);
+	return out;
 }
 
 function blockPredicate(text: string): string | null {
@@ -105,6 +194,14 @@ function blockPredicate(text: string): string | null {
 	return blocks.length === 1
 		? `{blocks:${snbtStr(blocks[0])}}`
 		: `{blocks:[${list}]}`;
+}
+
+/** Copy user JSON into `target` without prototype-pollution keys (shallow). */
+function safeMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+	for (const key of Object.keys(source)) {
+		if (UNSAFE_KEYS.has(key)) continue;
+		target[key] = source[key];
+	}
 }
 
 type Row = Record<string, unknown>;
@@ -123,6 +220,22 @@ function rowNum(row: Row, key: string, fallback = 1): number {
 	const v = row[key];
 	const n = typeof v === 'string' ? parseInt(v, 10) : typeof v === 'number' ? v : NaN;
 	return Number.isFinite(n) ? n : fallback;
+}
+
+/** Strict integer field: trimmed string that matches /^-?\d+$/ or '' . */
+function intField(values: Record<string, unknown>, key: string): string {
+	const v = values[key];
+	if (typeof v !== 'string') return '';
+	const s = v.trim();
+	return s && INT_RE.test(s) ? s : '';
+}
+
+/** Strict decimal field: trimmed string that matches /^-?\d+(\.\d+)?$/ or ''. */
+function floatField(values: Record<string, unknown>, key: string): string {
+	const v = values[key];
+	if (typeof v !== 'string') return '';
+	const s = v.trim();
+	return s && FLOAT_RE.test(s) ? s : '';
 }
 
 // ---- Java components ----
@@ -158,10 +271,10 @@ function buildJavaComponents(values: Record<string, unknown>): string[] {
 		out.push(`${key}={${levels}}`);
 	}
 
-	// Durability
-	const damage = typeof values.damage === 'string' ? values.damage.trim() : '';
+	// Durability (strict integers; invalid input is dropped, never injected).
+	const damage = intField(values, 'damage');
 	if (damage) out.push(`minecraft:damage=${damage}`);
-	const maxDamage = typeof values.maxDamage === 'string' ? values.maxDamage.trim() : '';
+	const maxDamage = intField(values, 'maxDamage');
 	if (maxDamage) out.push(`minecraft:max_damage=${maxDamage}`);
 	if (values.unbreakable === true) out.push('minecraft:unbreakable={}');
 
@@ -170,7 +283,7 @@ function buildJavaComponents(values: Record<string, unknown>): string[] {
 	if (rarity) out.push(`minecraft:rarity=${snbtStr(rarity)}`);
 	if (values.glint === 'true') out.push('minecraft:enchantment_glint_override=true');
 	if (values.glint === 'false') out.push('minecraft:enchantment_glint_override=false');
-	const cmd = typeof values.customModelData === 'string' ? values.customModelData.trim() : '';
+	const cmd = intField(values, 'customModelData');
 	if (cmd) out.push(`minecraft:custom_model_data=${cmd}`);
 	const itemModel = typeof values.itemModel === 'string' ? values.itemModel.trim() : '';
 	if (itemModel) out.push(`minecraft:item_model=${snbtStr(itemModel)}`);
@@ -212,12 +325,12 @@ function buildJavaComponents(values: Record<string, unknown>): string[] {
 	if (lock) out.push(`minecraft:lock={items:[${snbtStr(lock)}]}`);
 	if (values.fireResistant === true) out.push('minecraft:damage_resistant={types:"#minecraft:is_fire"}');
 	if (values.deathProtection === true) out.push('minecraft:death_protection={}');
-	const maxStack = typeof values.maxStackSize === 'string' ? values.maxStackSize.trim() : '';
+	const maxStack = intField(values, 'maxStackSize');
 	if (maxStack) out.push(`minecraft:max_stack_size=${maxStack}`);
-	const repairCost = typeof values.repairCost === 'string' ? values.repairCost.trim() : '';
+	const repairCost = intField(values, 'repairCost');
 	if (repairCost) out.push(`minecraft:repair_cost=${repairCost}`);
 	if (values.hideTooltip === true) out.push('minecraft:tooltip_display={hide_tooltip:true}');
-	const enchantable = typeof values.enchantable === 'string' ? values.enchantable.trim() : '';
+	const enchantable = intField(values, 'enchantable');
 	if (enchantable) out.push(`minecraft:enchantable={value:${enchantable}}`);
 
 	// Potion contents
@@ -242,7 +355,8 @@ function buildJavaComponents(values: Record<string, unknown>): string[] {
 	}
 
 	// Fireworks
-	const flight = typeof values.fireworkFlight === 'string' ? values.fireworkFlight.trim() : '';
+	const flightRaw = typeof values.fireworkFlight === 'string' ? values.fireworkFlight.trim() : '';
+	const flight = flightRaw && INT_RE.test(flightRaw) ? flightRaw : '';
 	const explosions = rows(values, 'fireworkExplosions').filter((r) => rowText(r, 'shape'));
 	if (flight || explosions.length) {
 		const exps = explosions.map((r) => fireworkExplosionSnbt(r)).join(',');
@@ -346,7 +460,7 @@ function buildJavaComponents(values: Record<string, unknown>): string[] {
 	if (jukebox) out.push(`minecraft:jukebox_playable=${snbtStr(jukebox)}`);
 
 	// Map id
-	const mapId = typeof values.mapId === 'string' ? values.mapId.trim() : '';
+	const mapId = intField(values, 'mapId');
 	if (mapId) out.push(`minecraft:map_id=${mapId}`);
 
 	// Spawn egg entity data
@@ -360,25 +474,25 @@ function buildJavaComponents(values: Record<string, unknown>): string[] {
 	}
 
 	// Food
-	const nutrition = typeof values.foodNutrition === 'string' ? values.foodNutrition.trim() : '';
-	const saturation = typeof values.foodSaturation === 'string' ? values.foodSaturation.trim() : '';
+	const nutrition = floatField(values, 'foodNutrition');
+	const saturationRaw = floatField(values, 'foodSaturation');
 	if (nutrition) {
-		const sat = saturation || '0.0';
+		const sat = saturationRaw || '0.0';
 		out.push(`minecraft:food={nutrition:${nutrition},saturation:${sat},can_always_eat:${values.foodCanAlwaysEat === true}}`);
 		// food only works alongside consumable; add a minimal one unless customized
-		const consumeSec = typeof values.consumableSeconds === 'string' ? values.consumableSeconds.trim() : '';
-		if (!consumeSec) out.push('minecraft:consumable={}');
+		const consumeSecCheck = floatField(values, 'consumableSeconds');
+		if (!consumeSecCheck) out.push('minecraft:consumable={}');
 	}
 
 	// Consumable
-	const consumeSec = typeof values.consumableSeconds === 'string' ? values.consumableSeconds.trim() : '';
+	const consumeSec = floatField(values, 'consumableSeconds');
 	if (consumeSec) {
 		const anim = typeof values.consumableAnimation === 'string' ? values.consumableAnimation : 'eat';
 		out.push(`minecraft:consumable={consume_seconds:${consumeSec},animation:${snbtStr(anim)},has_consume_particles:true}`);
 	}
 
 	// Use cooldown
-	const cooldown = typeof values.useCooldown === 'string' ? values.useCooldown.trim() : '';
+	const cooldown = floatField(values, 'useCooldown');
 	if (cooldown) out.push(`minecraft:use_cooldown={seconds:${cooldown}}`);
 
 	// Raw advanced components (appended verbatim)
@@ -423,7 +537,7 @@ function buildBedrockComponents(values: Record<string, unknown>): { json: string
 
 	if (values.bedrockKeepOnDeath === true) obj['minecraft:keep_on_death'] = {};
 
-	// Merge raw advanced JSON (validated).
+	// Merge raw advanced JSON (validated, prototype-pollution-safe).
 	const raw = typeof values.bedrockRawComponents === 'string' ? values.bedrockRawComponents.trim() : '';
 	if (raw) {
 		try {
@@ -431,7 +545,7 @@ function buildBedrockComponents(values: Record<string, unknown>): { json: string
 			if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
 				return { json: '', error: 'errorRawJsonObject' };
 			}
-			Object.assign(obj, parsed);
+			safeMerge(obj, parsed as Record<string, unknown>);
 		} catch {
 			return { json: '', error: 'errorRawJson' };
 		}
@@ -445,8 +559,13 @@ function buildBedrockComponents(values: Record<string, unknown>): { json: string
 // ---- Command assembly ----
 
 function resolveTarget(state: GiveState): string {
-	if (state.target === 'custom') return state.customTarget.trim() || '@p';
-	return state.target;
+	if (state.target === 'custom' || state.target === 'name') return state.customTarget.trim() || '@p';
+	const t = (state.target || '').trim();
+	if (SELECTOR_WHITELIST.has(t)) return t;
+	if (SELECTOR_ARGS_RE.test(t)) return t;
+	if (PLAYER_NAME_RE.test(t)) return t;
+	if (UUID_RE.test(t)) return t;
+	return '@p';
 }
 
 export function buildJavaCommand(state: GiveState): BuildResult {

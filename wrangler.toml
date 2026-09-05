@@ -1,0 +1,9 @@
+name = "bedrocktools"
+compatibility_date = "2026-09-02"
+pages_build_output_dir = "public"
+compatibility_flags = ["nodejs_compat"]
+
+# Pages Functions config via Wrangler (https://developers.cloudflare.com/pages/functions/wrangler-configuration/)
+# - pages_build_output_dir es el directorio de salida estático (public)
+# - compatibility_date controla Workers runtime (ver docs)
+# - nodejs_compat necesario si algún binding usa Node APIs (fflate es puro JS, pero se deja habilitado para compatibilidad)

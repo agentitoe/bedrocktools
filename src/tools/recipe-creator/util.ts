@@ -23,8 +23,9 @@ export function titleCase(s: string): string {
 	return s.replace(/(^|[ _-])([a-z])/g, (_, pre, ch) => pre + ch.toUpperCase());
 }
 
+/** Central HTML escaper for the recipe tool (covers `&<>"'`). */
 export function escapeHtml(s: string): string {
-	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 export function parseJsonText(text: string): any | null {
@@ -35,8 +36,11 @@ export function parseJsonText(text: string): any | null {
 	}
 }
 
+/** Shared singleton encoder (avoids one allocation per export call). */
+const utf8Encoder = new TextEncoder();
+
 export function strToU8(s: string): Uint8Array {
-	return new TextEncoder().encode(s);
+	return utf8Encoder.encode(s);
 }
 
 /** Wrap bytes in a Blob (copies into a fresh buffer to satisfy the BlobPart type). */
@@ -49,4 +53,22 @@ export function toBlob(bytes: Uint8Array, type: string): Blob {
 export function isValidIdentifier(id: string): boolean {
 	// Bedrock namespaces and Java resource locations both allow `-` and `.`.
 	return /^[a-z0-9_.-]+:[a-z0-9_.-]+$/.test(id);
+}
+
+/** Trailing-edge debounce: groups rapid calls (search inputs, live editors). */
+export function debounce<F extends (...args: never[]) => void>(fn: F, ms: number): F {
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	return ((...args: never[]) => {
+		if (timer !== null) clearTimeout(timer);
+		timer = setTimeout(() => {
+			timer = null;
+			fn(...args);
+		}, ms);
+	}) as F;
+}
+
+/** Clamp a count-like value into `[min, max]` with a fallback for NaN. */
+export function clampCount(n: number, min: number, max: number, fallback: number): number {
+	if (!Number.isFinite(n)) return fallback;
+	return Math.max(min, Math.min(max, Math.floor(n)));
 }

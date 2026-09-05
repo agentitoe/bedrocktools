@@ -1,21 +1,49 @@
 import type { ItemData } from './types';
 import { getItemName, getTextureFallbacks } from './data';
 import { renderModel, canRenderModel } from './canvas-renderer';
+import { LRUCache } from './texture-loader';
 
-// Render cache for 3D models
-const modelRenderCache = new Map<string, HTMLCanvasElement>();
-const modelLoadingSet = new Set<string>();
+// Unified bounded render cache (cap 300): layered + 3D model canvases share
+// one LRU. Keys are namespaced (`layered:<id>:<size>` vs `<model>:<size>`).
+const unifiedRenderCache = new LRUCache<string, HTMLCanvasElement>(300);
+// In-flight render dedupe: one promise per cacheKey.
+const renderInflight = new Map<string, Promise<void>>();
+// Placeholders waiting for an upgrade, registered directly (no global query).
+const pendingElements = new Map<string, Set<HTMLImageElement>>();
+const flushScheduled = new Set<string>();
 
-// Render cache for layered flat items (potions, tipped arrows, ...)
-const layeredRenderCache = new Map<string, HTMLCanvasElement>();
-const layeredLoadingSet = new Set<string>();
+const IMAGE_TIMEOUT_MS = 10_000;
 
 function loadImageElement(url: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const img = new Image();
-		img.onload = () => resolve(img);
-		img.onerror = () => reject(new Error(`Failed to load ${url}`));
-		img.src = url;
+		let settled = false;
+		const timer = setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			reject(new Error(`Timed out loading ${url}`));
+		}, IMAGE_TIMEOUT_MS);
+		img.onload = () => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			resolve(img);
+		};
+		img.onerror = () => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			reject(new Error(`Failed to load ${url}`));
+		};
+		try {
+			img.src = url;
+		} catch (e) {
+			if (!settled) {
+				settled = true;
+				clearTimeout(timer);
+				reject(e instanceof Error ? e : new Error(String(e)));
+			}
+		}
 	});
 }
 
@@ -65,24 +93,103 @@ async function createLayeredCanvas(item: ItemData, size: number): Promise<HTMLCa
 	return canvas;
 }
 
+// ---- Lazy 3D upgrade: only when the placeholder is actually visible ----
+
+let lazyObserver: IntersectionObserver | null = null;
+const observerTargets = new Map<HTMLImageElement, () => void>();
+
+function getLazyObserver(): IntersectionObserver | null {
+	if (typeof IntersectionObserver === 'undefined') return null;
+	if (lazyObserver) return lazyObserver;
+	try {
+		lazyObserver = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					if (!entry.isIntersecting) continue;
+					const el = entry.target as HTMLImageElement;
+					const trigger = observerTargets.get(el);
+					if (trigger) {
+						observerTargets.delete(el);
+						lazyObserver?.unobserve(el);
+						trigger();
+					}
+				}
+			},
+			{ rootMargin: '200px' }
+		);
+	} catch {
+		return null;
+	}
+	return lazyObserver;
+}
+
+function observeLazy(img: HTMLImageElement, trigger: () => void): void {
+	const io = getLazyObserver();
+	if (!io) {
+		// No IntersectionObserver (tests/SSR): upgrade on load like before.
+		if (img.complete) trigger();
+		else img.addEventListener('load', trigger, { once: true });
+		return;
+	}
+	observerTargets.set(img, trigger);
+	io.observe(img);
+	// If the image already completed and is in viewport, trigger soon.
+	if (img.complete) {
+		queueMicrotask(() => {
+			if (!observerTargets.has(img)) return;
+			// Still let the observer decide; but if already intersecting, fire.
+			// Fallback: fire directly when the element is already visible.
+			try {
+				const r = img.getBoundingClientRect();
+				const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+				if (r.top < vh + 200 && r.bottom > -200) {
+					observerTargets.delete(img);
+					io.unobserve(img);
+					trigger();
+				}
+			} catch {
+				// ignore, observer will fire
+			}
+		});
+	}
+}
+
 /**
- * Create image tag for an item - uses 3D isometric rendering for block items with models
+ * Create image tag for an item - uses 3D isometric rendering for block items with models.
+ * Dedupes concurrent renders per cacheKey.
  */
 async function createItemImage(item: ItemData, size: number = 48): Promise<HTMLCanvasElement | HTMLImageElement> {
 	// For layered flat items (potions, tipped arrows), composite the layers.
 	if (item.renderAs === 'layered') {
 		const cacheKey = `layered:${item.id}:${size}`;
-		if (layeredRenderCache.has(cacheKey)) return layeredRenderCache.get(cacheKey)!;
-		if (!layeredLoadingSet.has(cacheKey)) {
-			layeredLoadingSet.add(cacheKey);
-			try {
-				const canvas = await createLayeredCanvas(item, size);
-				if (!layeredRenderCache.has(cacheKey)) {
-					layeredRenderCache.set(cacheKey, canvas);
-					updateItemImageInPlace(cacheKey, size);
+		const hit = unifiedRenderCache.peek(cacheKey);
+		if (hit) {
+			unifiedRenderCache.get(cacheKey);
+			return hit;
+		}
+		if (!renderInflight.has(cacheKey)) {
+			const p = (async (): Promise<void> => {
+				try {
+					const canvas = await createLayeredCanvas(item, size);
+					if (!unifiedRenderCache.peek(cacheKey)) {
+						unifiedRenderCache.set(cacheKey, canvas);
+						scheduleFlush(cacheKey, size);
+					}
+				} catch {
+					// keep flat placeholder
 				}
+			})();
+			renderInflight.set(cacheKey, p);
+			try {
+				await p;
 			} finally {
-				layeredLoadingSet.delete(cacheKey);
+				renderInflight.delete(cacheKey);
+			}
+		} else {
+			try {
+				await renderInflight.get(cacheKey);
+			} catch {
+				// ignore
 			}
 		}
 		return createFlatImage(item, size);
@@ -94,26 +201,39 @@ async function createItemImage(item: ItemData, size: number = 48): Promise<HTMLC
 		const cacheKey = `${modelName}:${size}`;
 
 		// Check cache
-		if (modelRenderCache.has(cacheKey)) {
-			return modelRenderCache.get(cacheKey)!;
+		const hit = unifiedRenderCache.peek(cacheKey);
+		if (hit) {
+			unifiedRenderCache.get(cacheKey);
+			return hit;
 		}
 
 		// Render in background if not already in progress
-		if (!modelLoadingSet.has(cacheKey)) {
-			modelLoadingSet.add(cacheKey);
-			try {
-				const canRender = await canRenderModel(modelName);
-				if (canRender) {
-					const canvas = await renderModel(modelName, { size });
-					if (canvas && !modelRenderCache.has(cacheKey)) {
-						modelRenderCache.set(cacheKey, canvas);
-						updateItemImageInPlace(cacheKey, size);
+		if (!renderInflight.has(cacheKey)) {
+			const p = (async (): Promise<void> => {
+				try {
+					const canRender = await canRenderModel(modelName);
+					if (canRender) {
+						const canvas = await renderModel(modelName, { size });
+						if (canvas && !unifiedRenderCache.peek(cacheKey)) {
+							unifiedRenderCache.set(cacheKey, canvas);
+							scheduleFlush(cacheKey, size);
+						}
 					}
+				} catch (err) {
+					console.error(`[createItemImage] render error for ${modelName}:`, err);
 				}
-			} catch (err) {
-				console.error(`[createItemImage] render error for ${modelName}:`, err);
+			})();
+			renderInflight.set(cacheKey, p);
+			try {
+				await p;
 			} finally {
-				modelLoadingSet.delete(cacheKey);
+				renderInflight.delete(cacheKey);
+			}
+		} else {
+			try {
+				await renderInflight.get(cacheKey);
+			} catch {
+				// ignore
 			}
 		}
 	}
@@ -122,30 +242,51 @@ async function createItemImage(item: ItemData, size: number = 48): Promise<HTMLC
 	return createFlatImage(item, size);
 }
 
+/** rAF-batched in-place upgrade using directly registered elements (no querySelectorAll). */
+function scheduleFlush(cacheKey: string, size: number): void {
+	if (flushScheduled.has(cacheKey)) return;
+	flushScheduled.add(cacheKey);
+	const run = () => {
+		flushScheduled.delete(cacheKey);
+		updateItemImageInPlace(cacheKey, size);
+	};
+	if (typeof requestAnimationFrame !== 'undefined') {
+		requestAnimationFrame(run);
+	} else {
+		run();
+	}
+}
+
 /**
  * Update every placeholder image in-place once its 3D render completes.
- * Targets any <img> tagged with data-render-key (grid cards and recipe modal).
+ * Uses the directly registered placeholder elements (no global querySelectorAll).
  */
 function updateItemImageInPlace(cacheKey: string, size: number): void {
-	const canvas = modelRenderCache.get(cacheKey) || layeredRenderCache.get(cacheKey);
+	const canvas = unifiedRenderCache.peek(cacheKey);
 	if (!canvas) return;
+	const set = pendingElements.get(cacheKey);
+	if (!set || set.size === 0) return;
+	pendingElements.delete(cacheKey);
 
-	const placeholders = document.querySelectorAll(`[data-render-key="${cacheKey}"]`);
-	for (const el of Array.from(placeholders)) {
-		if (!(el instanceof HTMLImageElement)) continue;
-
-		const newCanvas = document.createElement('canvas');
-		newCanvas.width = size;
-		newCanvas.height = size;
-		const newCtx = newCanvas.getContext('2d')!;
-		newCtx.imageSmoothingEnabled = false;
-		newCtx.drawImage(canvas, 0, 0, size, size);
-		newCanvas.style.width = `${size}px`;
-		newCanvas.style.height = `${size}px`;
-		newCanvas.style.imageRendering = 'pixelated';
-		newCanvas.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))';
-
-		el.replaceWith(newCanvas);
+	for (const el of set) {
+		try {
+			// Skip detached or repurposed placeholders.
+			if (!el.isConnected) continue;
+			if (el.dataset.renderKey !== cacheKey) continue;
+			const newCanvas = document.createElement('canvas');
+			newCanvas.width = size;
+			newCanvas.height = size;
+			const newCtx = newCanvas.getContext('2d')!;
+			newCtx.imageSmoothingEnabled = false;
+			newCtx.drawImage(canvas, 0, 0, size, size);
+			newCanvas.style.width = `${size}px`;
+			newCanvas.style.height = `${size}px`;
+			newCanvas.style.imageRendering = 'pixelated';
+			newCanvas.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))';
+			el.replaceWith(newCanvas);
+		} catch {
+			// ignore detached nodes
+		}
 	}
 }
 
@@ -191,24 +332,32 @@ export function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 export function createImgTag(item: ItemData, size: number = 48): HTMLCanvasElement | HTMLImageElement {
-	// Defer the (async) 3D/layered render until the flat placeholder actually
-	// loads, so off-screen items don't trigger model/texture fetches.
-	const deferRender = (img: HTMLImageElement) => {
-		if (img.complete) {
-			void createItemImage(item, size);
-		} else {
-			img.addEventListener('load', () => void createItemImage(item, size), { once: true });
+	// Defer the (async) 3D/layered render until the flat placeholder is near
+	// the viewport, so off-screen items don't trigger model/texture fetches.
+	// The flat placeholder renders immediately.
+	const deferRender = (img: HTMLImageElement, cacheKey: string) => {
+		let set = pendingElements.get(cacheKey);
+		if (!set) {
+			set = new Set<HTMLImageElement>();
+			pendingElements.set(cacheKey, set);
 		}
+		set.add(img);
+		observeLazy(img, () => {
+			void createItemImage(item, size);
+		});
 	};
 
-	// For layered items, check the layered render cache
+	// For layered items, check the unified render cache
 	if (item.renderAs === 'layered') {
 		const cacheKey = `layered:${item.id}:${size}`;
-		const cached = layeredRenderCache.get(cacheKey);
-		if (cached) return cloneCanvas(cached);
+		const cached = unifiedRenderCache.peek(cacheKey);
+		if (cached) {
+			unifiedRenderCache.get(cacheKey);
+			return cloneCanvas(cached);
+		}
 		const img = createFlatImage(item, size);
 		img.dataset.renderKey = cacheKey;
-		deferRender(img);
+		deferRender(img, cacheKey);
 		return img;
 	}
 
@@ -216,13 +365,14 @@ export function createImgTag(item: ItemData, size: number = 48): HTMLCanvasEleme
 	const modelName = item.renderAs === 'block' ? item.modelName : undefined;
 	if (modelName) {
 		const cacheKey = `${modelName}:${size}`;
-		const cached = modelRenderCache.get(cacheKey);
+		const cached = unifiedRenderCache.peek(cacheKey);
 		if (cached) {
+			unifiedRenderCache.get(cacheKey);
 			return cloneCanvas(cached);
 		}
 		const img = createFlatImage(item, size);
 		img.dataset.renderKey = cacheKey;
-		deferRender(img);
+		deferRender(img, cacheKey);
 		return img;
 	}
 

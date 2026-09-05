@@ -48,14 +48,114 @@ export interface UiHooks {
 }
 
 function languageByCode(code: string): Language | undefined {
-	return LANGUAGES.find((l) => l.code === code);
+	for (let i = 0; i < LANGUAGES.length; i++) {
+		if (LANGUAGES[i].code === code) return LANGUAGES[i];
+	}
+	return undefined;
+}
+
+/* ------------------------------------------------------------------ */
+/* Safe storage + cached DOM refs (perf + privacy-mode resilience)      */
+/* ------------------------------------------------------------------ */
+
+function safeGet(key: string): string | null {
+	try {
+		return localStorage.getItem(key);
+	} catch {
+		return null;
+	}
+}
+
+function safeSet(key: string, value: string): void {
+	try {
+		localStorage.setItem(key, value);
+	} catch {
+		/* Storage unavailable (private mode / blocked): ignore. */
+	}
+}
+
+/** Cache of top-level elements by id; revalidates `isConnected`. */
+const elCache = new Map<string, HTMLElement | null>();
+
+function getEl(id: string): HTMLElement | null {
+	const cached = elCache.get(id);
+	if (cached !== undefined) {
+		if (cached === null) {
+			// May have been added to the DOM after the first miss.
+			const fresh = document.getElementById(id);
+			if (fresh) elCache.set(id, fresh);
+			return fresh;
+		}
+		if (cached.isConnected) return cached;
+		elCache.delete(id);
+	}
+	const el = document.getElementById(id);
+	elCache.set(id, el);
+	return el;
+}
+
+let darkMediaQuery: MediaQueryList | null = null;
+
+/** Cached `matchMedia('(prefers-color-scheme: dark)')`. */
+function prefersDark(): boolean {
+	try {
+		if (!darkMediaQuery) {
+			darkMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+		}
+		return darkMediaQuery.matches;
+	} catch {
+		return false;
+	}
+}
+
+/** Set `<span class="noto-color-emoji-regular">emoji</span>` without innerHTML. */
+function setEmojiIcon(container: Element, emoji: string): void {
+	// Fast path: reuse the existing span when present.
+	const first = container.firstElementChild;
+	if (
+		first &&
+		first.tagName === "SPAN" &&
+		first.classList.contains("noto-color-emoji-regular") &&
+		container.childNodes.length === 1
+	) {
+		first.textContent = emoji;
+		return;
+	}
+	container.textContent = "";
+	const span = document.createElement("span");
+	span.className = "noto-color-emoji-regular";
+	span.textContent = emoji;
+	container.appendChild(span);
+}
+
+/** True when an i18n string carries markup and needs innerHTML. */
+function hasMarkup(value: string): boolean {
+	return value.indexOf("<") !== -1 && value.indexOf(">") !== -1;
+}
+
+/**
+ * Set element text preserving observable output: plain strings go through
+ * the fast/safe `textContent` path, strings with markup keep `innerHTML`
+ * so translated `<strong>/<u>/…` still renders.
+ */
+function setI18nContent(el: Element, value: string): void {
+	if (hasMarkup(value)) {
+		el.innerHTML = value;
+	} else if (el.textContent !== value) {
+		el.textContent = value;
+	}
 }
 
 /** The user's preferred language: saved choice -> browser -> fallback. */
 export function getLang(): string {
-	const saved = localStorage.getItem('lang');
+	const saved = safeGet('lang');
 	if (saved && languageByCode(saved)) return saved;
-	const browser = (navigator.language || navigator.languages?.[0] || '').toLowerCase();
+	let browser = "";
+	try {
+		browser = (navigator.language || navigator.languages?.[0] || '').toLowerCase();
+	} catch {
+		browser = "";
+	}
 	const base = browser.split('-')[0];
 	if (base && languageByCode(base)) return base;
 	return FALLBACK_LANG;
@@ -73,12 +173,27 @@ function resolveLang(translations: TranslationTable, requested: string): string 
 }
 
 function setLangToggleLabel(lang: string): void {
-	const langToggle = document.getElementById('langToggle');
+	const langToggle = getEl('langToggle');
 	if (!langToggle) return;
 	const meta = languageByCode(lang);
 	const flag = meta ? meta.flag : '';
 	const label = meta ? meta.label : lang.toUpperCase();
-	langToggle.innerHTML = `<span class="noto-color-emoji-regular">${flag}</span> <span class="label">${label}</span>`;
+	// Reuse existing spans when possible to avoid layout churn.
+	const flagSpan = langToggle.querySelector(':scope > .noto-color-emoji-regular');
+	const labelSpan = langToggle.querySelector(':scope > .label');
+	if (flagSpan && labelSpan && langToggle.childNodes.length === 3) {
+		if (flagSpan.textContent !== flag) flagSpan.textContent = flag;
+		if (labelSpan.textContent !== label) labelSpan.textContent = label;
+		return;
+	}
+	langToggle.textContent = '';
+	const flagEl = document.createElement('span');
+	flagEl.className = 'noto-color-emoji-regular';
+	flagEl.textContent = flag;
+	const labelEl = document.createElement('span');
+	labelEl.className = 'label';
+	labelEl.textContent = label;
+	langToggle.append(flagEl, document.createTextNode(' '), labelEl);
 }
 
 /**
@@ -87,9 +202,10 @@ function setLangToggleLabel(lang: string): void {
  * actually supports.
  */
 function buildLangMenu(translations: TranslationTable): void {
-	const dropdown = document.getElementById('langDropdown');
+	const dropdown = getEl('langDropdown');
 	if (!dropdown) return;
-	dropdown.innerHTML = '';
+	dropdown.textContent = '';
+	const frag = document.createDocumentFragment();
 	for (const meta of LANGUAGES) {
 		const btn = document.createElement('button');
 		btn.type = 'button';
@@ -97,13 +213,17 @@ function buildLangMenu(translations: TranslationTable): void {
 		btn.setAttribute('role', 'menuitem');
 		btn.dataset.lang = meta.code;
 		btn.title = meta.name;
-		btn.innerHTML = `<span class="noto-color-emoji-regular">${meta.flag}</span> ${meta.label}`;
+		const flagEl = document.createElement('span');
+		flagEl.className = 'noto-color-emoji-regular';
+		flagEl.textContent = meta.flag;
+		btn.append(flagEl, document.createTextNode(' ' + meta.label));
 		if (!translations[meta.code]) {
-			btn.disabled = true;
+			(btn as HTMLButtonElement).disabled = true;
 			btn.setAttribute('aria-disabled', 'true');
 		}
-		dropdown.appendChild(btn);
+		frag.appendChild(btn);
 	}
+	dropdown.appendChild(frag);
 }
 
 /**
@@ -116,17 +236,21 @@ export function applyLang(lang: string, translations: TranslationTable, hooks?: 
 	setLangToggleLabel(lang);
 	const t = translations[lang];
 	if (t) {
-		document.querySelectorAll('[data-i18n]').forEach((el) => {
+		const nodes = document.querySelectorAll('[data-i18n]');
+		for (let i = 0; i < nodes.length; i++) {
+			const el = nodes[i] as HTMLElement;
 			const key = el.getAttribute('data-i18n');
-			if (!key || t[key] === undefined) return;
+			if (!key) continue;
+			const value = t[key];
+			if (value === undefined) continue;
 			if (el instanceof HTMLInputElement && el.type !== 'submit' && el.type !== 'button') {
-				el.placeholder = t[key];
+				if (el.placeholder !== value) el.placeholder = value;
 			} else if (el instanceof HTMLTextAreaElement) {
-				el.placeholder = t[key];
+				if (el.placeholder !== value) el.placeholder = value;
 			} else {
-				el.innerHTML = t[key];
+				setI18nContent(el, value);
 			}
-		});
+		}
 	}
 	hooks?.onApplyLang?.(lang);
 }
@@ -135,87 +259,117 @@ export function applyLang(lang: string, translations: TranslationTable, hooks?: 
 export function applyTitles(lang: string, translations: TranslationTable): void {
 	const t = translations[lang];
 	if (!t) return;
-	const langToggle = document.getElementById('langToggle');
+	const langToggle = getEl('langToggle');
 	if (langToggle) {
-		langToggle.title = t.changeLanguageTitle;
-		langToggle.setAttribute('aria-label', t.changeLanguageTitle);
+		if (langToggle.title !== t.changeLanguageTitle) langToggle.title = t.changeLanguageTitle;
+		if (langToggle.getAttribute('aria-label') !== t.changeLanguageTitle) {
+			langToggle.setAttribute('aria-label', t.changeLanguageTitle);
+		}
 	}
-	const themeToggle = document.getElementById('themeToggle');
+	const themeToggle = getEl('themeToggle');
 	if (themeToggle) {
 		const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-		themeToggle.title = isDark ? t.switchToLightTitle : t.switchToDarkTitle;
-		themeToggle.setAttribute('aria-label', isDark ? t.switchToLightTitle : t.switchToDarkTitle);
+		const title = isDark ? t.switchToLightTitle : t.switchToDarkTitle;
+		if (themeToggle.title !== title) themeToggle.title = title;
+		if (themeToggle.getAttribute('aria-label') !== title) {
+			themeToggle.setAttribute('aria-label', title);
+		}
 	}
 }
 
 export function setLang(lang: string, translations: TranslationTable, hooks?: UiHooks): void {
-	localStorage.setItem('lang', lang);
+	safeSet('lang', lang);
 	applyLang(lang, translations, hooks);
 	applyTitles(lang, translations);
 	hooks?.onLangChange?.(lang);
 }
 
 export function initTheme(): void {
-	const themeToggle = document.getElementById('themeToggle');
+	const themeToggle = getEl('themeToggle');
 	if (!themeToggle) return;
-	const savedTheme = localStorage.getItem('theme');
+	const savedTheme = safeGet('theme');
 	if (savedTheme === 'dark') {
 		document.documentElement.setAttribute('data-theme', 'dark');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">🌙</span>';
+		setEmojiIcon(themeToggle, '🌙');
 	} else if (savedTheme === 'light') {
 		document.documentElement.removeAttribute('data-theme');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">☀️</span>';
-	} else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+		setEmojiIcon(themeToggle, '☀️');
+	} else if (prefersDark()) {
 		document.documentElement.setAttribute('data-theme', 'dark');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">🌙</span>';
-		localStorage.setItem('theme', 'dark');
+		setEmojiIcon(themeToggle, '🌙');
+		safeSet('theme', 'dark');
 	} else {
 		document.documentElement.removeAttribute('data-theme');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">☀️</span>';
-		localStorage.setItem('theme', 'light');
+		setEmojiIcon(themeToggle, '☀️');
+		safeSet('theme', 'light');
 	}
 }
 
+const THEME_BOUND = 'data-ui-theme-bound';
+
 export function initThemeToggle(translations: TranslationTable): void {
-	const themeToggle = document.getElementById('themeToggle');
+	const themeToggle = getEl('themeToggle');
 	if (!themeToggle) return;
+	if (themeToggle.hasAttribute(THEME_BOUND)) return;
+	themeToggle.setAttribute(THEME_BOUND, '1');
 	themeToggle.addEventListener('click', () => {
 		const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 		if (isDark) {
 			document.documentElement.removeAttribute('data-theme');
-			localStorage.setItem('theme', 'light');
-			themeToggle.innerHTML = '<span class="noto-color-emoji-regular">☀️</span>';
+			safeSet('theme', 'light');
+			setEmojiIcon(themeToggle, '☀️');
 		} else {
 			document.documentElement.setAttribute('data-theme', 'dark');
-			localStorage.setItem('theme', 'dark');
-			themeToggle.innerHTML = '<span class="noto-color-emoji-regular">🌙</span>';
+			safeSet('theme', 'dark');
+			setEmojiIcon(themeToggle, '🌙');
 		}
 		applyTitles(resolveLang(translations, getLang()), translations);
 	});
 }
 
-export function initDropdowns(translations: TranslationTable, hooks?: UiHooks): void {
-	const langToggle = document.getElementById('langToggle');
-	const langDropdown = document.getElementById('langDropdown');
-	if (!langToggle || !langDropdown) return;
-	langToggle.addEventListener('click', (e) => {
-		e.stopPropagation();
-		langDropdown.classList.toggle('open');
-	});
-	document.querySelectorAll('.lang-option').forEach((option) => {
-		option.addEventListener('click', () => {
-			const lang = option.getAttribute('data-lang');
-			if (lang === null) return;
-			setLang(lang, translations, hooks);
-			langDropdown.classList.remove('open');
-		});
-	});
+/* Single delegated document listener for the language dropdown. */
+let dropdownDelegated = false;
+let dropdownState: { translations: TranslationTable; hooks?: UiHooks } | null = null;
+
+function ensureDropdownDelegation(): void {
+	if (dropdownDelegated) return;
+	dropdownDelegated = true;
 	document.addEventListener('click', (e) => {
-		const target = e.target;
-		if (target instanceof Node && !langDropdown.contains(target) && target !== langToggle) {
+		const state = dropdownState;
+		if (!state) return;
+		const langDropdown = getEl('langDropdown');
+		const langToggle = getEl('langToggle');
+		if (!langDropdown || !langToggle) return;
+		const target = e.target as Element | null;
+		if (!target) return;
+		const option = (target as HTMLElement).closest
+			? (target as HTMLElement).closest('.lang-option')
+			: null;
+		if (option && langDropdown.contains(option)) {
+			const lang = option.getAttribute('data-lang');
+			if (lang !== null && state.translations[lang]) {
+				setLang(lang, state.translations, state.hooks);
+			}
+			langDropdown.classList.remove('open');
+			return;
+		}
+		if (target === langToggle || (target instanceof Node && langToggle.contains(target))) {
+			langDropdown.classList.toggle('open');
+			return;
+		}
+		if (!langDropdown.contains(target as Node)) {
 			langDropdown.classList.remove('open');
 		}
 	});
+}
+
+export function initDropdowns(translations: TranslationTable, hooks?: UiHooks): void {
+	const langToggle = getEl('langToggle');
+	const langDropdown = getEl('langDropdown');
+	if (!langToggle || !langDropdown) return;
+	// Latest table/hooks win; the single document listener reads them.
+	dropdownState = { translations, hooks };
+	ensureDropdownDelegation();
 }
 
 /** Wire up theme + language for a page. Returns the active language. */
@@ -224,7 +378,7 @@ export function initUi(translations: TranslationTable, hooks?: UiHooks): string 
 	const lang = resolveLang(translations, getLang());
 	// Persist the resolved language so later getLang() calls (e.g. in event
 	// handlers) return a language this page actually supports.
-	localStorage.setItem('lang', lang);
+	safeSet('lang', lang);
 	initTheme();
 	applyLang(lang, translations, hooks);
 	applyTitles(lang, translations);

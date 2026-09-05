@@ -2,6 +2,11 @@
 // Create custom recipes (shaped / shapeless / furnace) using Minecraft's vanilla GUIs and
 // export them all together as a single .mcpack addon. Reuses the 3D models and
 // (ES/EN) names from the minecraft-items tool.
+//
+// Structure of this module:
+// - STATE: re-exports of the tool state plus local UI helpers.
+// - RENDER: platform-dependent labels/visibility (`applyPlatformUI`).
+// - EVENTS: bootstrap wiring (delegated platform switch, debounced pack name).
 
 import { initUi, setLang as uiSetLang } from '../../shared/ui';
 import type { ItemData } from './types';
@@ -21,6 +26,7 @@ import {
 import { renderRecipeList, renderEditor, addRecipe, currentPickerQuery, renderPickerGrid } from './editor';
 import { handleImport } from './import';
 import { exportMcpack, JAVA_VERSIONS } from './export';
+import { debounce } from './util';
 
 // ---- Language / theme (shared logic, page-specific hooks) ----
 
@@ -179,12 +185,12 @@ async function initTool() {
 
 	document.getElementById('addRecipeBtn')?.addEventListener('click', addRecipe);
 
-	// Platform toggle (Bedrock / Java).
-	document.querySelectorAll('.platform-tab').forEach((tab) => {
-		tab.addEventListener('click', () => {
-			const p = tab.getAttribute('data-platform');
-			if (p === 'bedrock' || p === 'java') setPlatform(p);
-		});
+	// Platform toggle (Bedrock / Java): one delegated listener on the switch.
+	document.querySelector('.platform-switch')?.addEventListener('click', (e) => {
+		const tab = (e.target as HTMLElement).closest('.platform-tab') as HTMLElement | null;
+		if (!tab) return;
+		const p = tab.getAttribute('data-platform');
+		if (p === 'bedrock' || p === 'java') setPlatform(p);
 	});
 
 	// Import: file input + click + drag & drop.
@@ -220,7 +226,10 @@ async function initTool() {
 
 	const packNameInput = document.getElementById('packNameInput') as HTMLInputElement | null;
 	if (packNameInput) {
-		packNameInput.addEventListener('input', () => { setPackName(packNameInput.value); });
+		// Debounced while typing (no work per keystroke), committed on change.
+		const debouncedName = debounce((v: string) => setPackName(v), 150);
+		packNameInput.addEventListener('input', () => debouncedName(packNameInput.value));
+		packNameInput.addEventListener('change', () => setPackName(packNameInput.value));
 	}
 	const exportBtn = document.getElementById('exportBtn');
 	if (exportBtn) exportBtn.addEventListener('click', exportMcpack);

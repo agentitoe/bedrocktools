@@ -24,9 +24,69 @@ import {
 } from './state';
 import { getOrCreateCustomItem, resolveItemId, extractItemIdentifier } from './items';
 import { sanitizeName, parseJsonText, uuid, toBlob, escapeHtml } from './util';
-import { normalizePath } from '../../shared/path';
+import { normalizePath, sanitizeZipPath } from '../../shared/path';
 import { decodeUtf8Sig } from '../../shared/encoding';
 import { renderRecipeList, renderEditor } from './editor';
+
+// ---- Import limits (zip-bomb / traversal hardening) ----
+
+/** Max entries accepted from a single archive (outer or nested). */
+const MAX_ZIP_ENTRIES = 2000;
+/** Max total decompressed bytes accepted from a single archive (200 MiB). */
+const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
+/** Max decompressed bytes for any single entry (50 MiB). */
+const MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024;
+/** Max TGA texture dimension (width/height). */
+const MAX_TGA_DIMENSION = 4096;
+
+/**
+ * Unzip with guards: try/catch, entry-count and decompressed-size caps, and
+ * `sanitizeZipPath` rejection of absolute paths / drive letters / `..`
+ * traversal. Returns null when the archive must be rejected.
+ */
+function safeUnzip(buffer: Uint8Array): Map<string, Uint8Array> | null {
+	let raw: Record<string, Uint8Array>;
+	try {
+		raw = unzipSync(buffer);
+	} catch {
+		return null;
+	}
+	const entries = Object.entries(raw);
+	if (entries.length > MAX_ZIP_ENTRIES) return null;
+	let total = 0;
+	const out = new Map<string, Uint8Array>();
+	for (const [p, b] of entries) {
+		const clean = sanitizeZipPath(normalizePath(p));
+		if (!clean) continue; // traversal / absolute / drive-letter entry
+		if (clean.endsWith('/')) continue; // directory entry
+		if (b.length > MAX_SINGLE_FILE_BYTES) return null;
+		total += b.length;
+		if (total > MAX_TOTAL_BYTES) return null;
+		if (!out.has(clean)) out.set(clean, b);
+	}
+	return out;
+}
+
+// ---- Blob URL lifetime (extracted textures) ----
+
+const createdObjectUrls = new Set<string>();
+
+function trackObjectUrl(url: string | null): string | null {
+	if (url && url.startsWith('blob:')) createdObjectUrls.add(url);
+	return url;
+}
+
+/** Revoke every blob URL created for imported textures (call on re-import). */
+export function revokeImportedUrls(): void {
+	for (const url of createdObjectUrls) {
+		try {
+			URL.revokeObjectURL(url);
+		} catch {
+			// Already revoked or invalid — nothing to do.
+		}
+	}
+	createdObjectUrls.clear();
+}
 
 // ---- Path / manifest helpers ----
 
@@ -63,7 +123,7 @@ function findPackFile(pack: ImportedPack, relPath: string): Uint8Array | undefin
 // ---- Texture decoding (TGA + PNG/JPG) ----
 
 /** Minimal TGA decoder (uncompressed + RLE, 24/32-bit) — common in Bedrock resource packs. */
-function decodeTga(bytes: Uint8Array): { width: number; height: number; pixels: Uint8ClampedArray } | null {
+export function decodeTga(bytes: Uint8Array): { width: number; height: number; pixels: Uint8ClampedArray } | null {
 	if (bytes.length < 18) return null;
 	const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	const idLength = dv.getUint8(0);
@@ -80,10 +140,17 @@ function decodeTga(bytes: Uint8Array): { width: number; height: number; pixels: 
 	if (pixelDepth !== 24 && pixelDepth !== 32) return null;
 	if (imageType !== 2 && imageType !== 10) return null;
 	if (width <= 0 || height <= 0) return null;
+	if (width > MAX_TGA_DIMENSION || height > MAX_TGA_DIMENSION) return null;
+	if (colorMapLength > 0 && colorMapEntrySize % 8 !== 0) return null;
 
 	const bpp = pixelDepth / 8;
-	let offset = 18 + idLength + (colorMapLength * colorMapEntrySize) / 8;
+	const offset = 18 + idLength + (colorMapLength * colorMapEntrySize) / 8;
+	// Validate the data offset before touching pixel data.
+	if (!Number.isFinite(offset) || offset < 0 || offset > bytes.length) return null;
 	const pixelCount = width * height;
+	if (!Number.isSafeInteger(pixelCount) || pixelCount > MAX_TGA_DIMENSION * MAX_TGA_DIMENSION) return null;
+	// Uncompressed payload must fit (RLE is variable-size; guarded per-packet below).
+	if (imageType === 2 && offset + pixelCount * bpp > bytes.length) return null;
 	const pixels = new Uint8ClampedArray(pixelCount * 4);
 	const flipV = (descriptor & 0x20) === 0; // TGA origin is bottom-left by default
 	const flipH = (descriptor & 0x10) !== 0;
@@ -100,30 +167,31 @@ function decodeTga(bytes: Uint8Array): { width: number; height: number; pixels: 
 		pixels[o + 3] = a;
 	};
 
+	let pos = offset;
 	if (imageType === 2) {
 		for (let i = 0; i < pixelCount; i++) {
-			if (offset + bpp > bytes.length) break;
-			write(i, bytes[offset + 2], bytes[offset + 1], bytes[offset], bpp === 4 ? bytes[offset + 3] : 255);
-			offset += bpp;
+			if (pos + bpp > bytes.length) break;
+			write(i, bytes[pos + 2], bytes[pos + 1], bytes[pos], bpp === 4 ? bytes[pos + 3] : 255);
+			pos += bpp;
 		}
 	} else {
 		let i = 0;
-		while (i < pixelCount && offset < bytes.length) {
-			const packet = bytes[offset++];
+		while (i < pixelCount && pos < bytes.length) {
+			const packet = bytes[pos++];
 			const count = (packet & 0x7f) + 1;
 			if (packet & 0x80) {
-				if (offset + bpp > bytes.length) break;
-				const r = bytes[offset + 2];
-				const g = bytes[offset + 1];
-				const b = bytes[offset];
-				const a = bpp === 4 ? bytes[offset + 3] : 255;
-				offset += bpp;
+				if (pos + bpp > bytes.length) break;
+				const r = bytes[pos + 2];
+				const g = bytes[pos + 1];
+				const b = bytes[pos];
+				const a = bpp === 4 ? bytes[pos + 3] : 255;
+				pos += bpp;
 				for (let j = 0; j < count && i < pixelCount; j++, i++) write(i, r, g, b, a);
 			} else {
 				for (let j = 0; j < count && i < pixelCount; j++, i++) {
-					if (offset + bpp > bytes.length) break;
-					write(i, bytes[offset + 2], bytes[offset + 1], bytes[offset], bpp === 4 ? bytes[offset + 3] : 255);
-					offset += bpp;
+					if (pos + bpp > bytes.length) break;
+					write(i, bytes[pos + 2], bytes[pos + 1], bytes[pos], bpp === 4 ? bytes[pos + 3] : 255);
+					pos += bpp;
 				}
 			}
 		}
@@ -155,7 +223,7 @@ function bytesToImageUrl(bytes: Uint8Array, ext: string): string | null {
 	const mime = lower === 'png' ? 'image/png' : (lower === 'jpg' || lower === 'jpeg') ? 'image/jpeg' : null;
 	if (!mime) return null;
 	try {
-		return URL.createObjectURL(toBlob(bytes, mime));
+		return trackObjectUrl(URL.createObjectURL(toBlob(bytes, mime)));
 	} catch {
 		return null;
 	}
@@ -481,10 +549,8 @@ async function handleDataPackImport(file: File): Promise<void> {
 
 	try {
 		const buffer = new Uint8Array(await file.arrayBuffer());
-		let entries: Map<string, Uint8Array>;
-		try {
-			entries = new Map(Object.entries(unzipSync(buffer)).map(([p, b]) => [normalizePath(p), b]));
-		} catch {
+		const entries = safeUnzip(buffer);
+		if (!entries) {
 			showError(t.importError);
 			return;
 		}
@@ -503,6 +569,7 @@ async function handleDataPackImport(file: File): Promise<void> {
 		}
 		const recipeFiles = [...files.keys()].filter(isDataPackRecipePath);
 
+		revokeImportedUrls();
 		setImportedDataPack({ mcmeta, files, recipeFiles });
 		setImportedPacks([]);
 		setImportedSourceName(file.name);
@@ -569,7 +636,10 @@ export async function handleImport(file: File): Promise<void> {
 
 function collectPack(files: Map<string, Uint8Array>, archivePath: string, packs: ImportedPack[]): void {
 	const normalized = new Map<string, Uint8Array>();
-	for (const [p, b] of files) normalized.set(normalizePath(p), b);
+	for (const [p, b] of files) {
+		const clean = sanitizeZipPath(normalizePath(p));
+		if (clean) normalized.set(clean, b);
+	}
 
 	const manifestPath = [...normalized.keys()].find((p) => p.split('/').pop()?.toLowerCase() === 'manifest.json');
 	if (!manifestPath) return;
@@ -588,22 +658,14 @@ function collectPack(files: Map<string, Uint8Array>, archivePath: string, packs:
 
 function extractPacks(buffer: Uint8Array): ImportedPack[] {
 	const packs: ImportedPack[] = [];
-	let top: Map<string, Uint8Array>;
-	try {
-		top = new Map(Object.entries(unzipSync(buffer)).map(([p, b]) => [normalizePath(p), b]));
-	} catch {
-		return packs;
-	}
+	const top = safeUnzip(buffer);
+	if (!top) return packs;
 
 	// Nested .mcpack files (a .mcaddon bundles one per pack).
 	for (const [p, b] of top) {
 		if (p.toLowerCase().endsWith('.mcpack')) {
-			let inner: Map<string, Uint8Array>;
-			try {
-				inner = new Map(Object.entries(unzipSync(b)).map(([ip, ib]) => [normalizePath(ip), ib]));
-			} catch {
-				continue;
-			}
+			const inner = safeUnzip(b);
+			if (!inner) continue;
 			collectPack(inner, p, packs);
 		}
 	}
@@ -629,6 +691,7 @@ async function handleImportFile(file: File): Promise<void> {
 			return;
 		}
 
+		revokeImportedUrls();
 		setImportedPacks(packs);
 		setImportedDataPack(null);
 		setImportedSourceName(file.name);

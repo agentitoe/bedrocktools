@@ -1,7 +1,9 @@
 // Isometric Projector
-// Projects 3D vertices to 2D isometric coordinates for Minecraft-style rendering
+// Projects 3D vertices to 2D isometric coordinates for Minecraft-style rendering.
+// Optimized to avoid per-frame allocations: manual loops, no .map/.reduce in
+// hot paths. sortFacesByDepth stays non-mutating (tests).
 
-import { Vec3, Face } from './model-parser';
+import type { Vec3, Face } from './model-parser';
 
 export interface ProjectedFace {
 	vertices: ProjectedVertex[];
@@ -28,67 +30,86 @@ export interface UV {
  * "inventory" view. The projection is therefore a plain orthographic projection:
  * keep x, keep y (flipped for canvas), drop z. Depth for painter's sorting is the
  * transformed z coordinate.
+ * MATH UNTOUCHED.
  */
 export function projectToIsometric(v: Vec3): ProjectedVertex {
 	return { x: v.x, y: -v.y };
 }
 
 /**
- * Compute the outward normal of a face from its (already display-transformed)
- * 3D vertices. Used to cull faces that point away from the camera.
- */
-function transformedFaceNormal(vertices: Vec3[]): Vec3 {
-	const [v0, v1, v2] = vertices;
-	const e1 = { x: v1.x - v0.x, y: v1.y - v0.y, z: v1.z - v0.z };
-	const e2 = { x: v2.x - v0.x, y: v2.y - v0.y, z: v2.z - v0.z };
-	return {
-		x: e1.y * e2.z - e1.z * e2.y,
-		y: e1.z * e2.x - e1.x * e2.z,
-		z: e1.x * e2.y - e1.y * e2.x
-	};
-}
-
-/**
  * Project all faces to 2D, culling back faces and computing depth for sorting.
+ * Single-pass, pre-sized output, no intermediate .map/.reduce allocs.
  */
 export function projectFaces(faces: Face[]): ProjectedFace[] {
-	const projected: ProjectedFace[] = [];
-
-	for (const face of faces) {
+	const out: ProjectedFace[] = [];
+	for (let i = 0; i < faces.length; i++) {
+		const face = faces[i];
+		const verts = face.vertices;
+		if (verts.length < 3) continue;
 		// Back-face culling: the camera looks along -Z, so only faces whose
 		// (transformed) normal points toward +Z are visible. Without this the
 		// hidden faces bleed through and corrupt the icon.
-		const n = transformedFaceNormal(face.vertices);
-		if (n.z <= 0) continue;
+		// Inline (e1 x e2).z — avoids allocating e1/e2/normal objects per face.
+		const v0 = verts[0];
+		const v1 = verts[1];
+		const v2 = verts[2];
+		const e1x = v1.x - v0.x;
+		const e1y = v1.y - v0.y;
+		const e2x = v2.x - v0.x;
+		const e2y = v2.y - v0.y;
+		const nz = e1x * e2y - e1y * e2x;
+		if (nz <= 0) continue;
 
-		const projectedVertices = face.vertices.map(projectToIsometric);
+		const n = verts.length;
+		const projectedVertices: ProjectedVertex[] = new Array<ProjectedVertex>(n);
+		let zSum = 0;
+		for (let k = 0; k < n; k++) {
+			const v = verts[k];
+			projectedVertices[k] = { x: v.x, y: -v.y };
+			zSum += v.z;
+		}
 
-		// Depth for painter's algorithm: transformed Z. Larger Z is closer to
-		// the camera, so it is drawn last (see sortFacesByDepth).
-		const avgZ = face.vertices.reduce((sum, v) => sum + v.z, 0) / face.vertices.length;
-
-		projected.push({
+		out.push({
 			vertices: projectedVertices,
 			uv: face.uv,
 			textureRef: face.textureRef,
-			avgDepth: avgZ,
+			avgDepth: zSum / n,
 			normal: face.normal
 		});
 	}
 
-	return projected;
+	return out;
 }
 
 /**
  * Sort faces by depth (painter's algorithm) - back to front.
  * The camera looks along -Z, so smaller Z is farther away and is drawn first.
+ * Non-mutating: returns a new sorted array (tests rely on this).
  */
 export function sortFacesByDepth(faces: ProjectedFace[]): ProjectedFace[] {
-	return [...faces].sort((a, b) => a.avgDepth - b.avgDepth);
+	return faces.slice().sort((a, b) => a.avgDepth - b.avgDepth);
+}
+
+function computeBounds(faces: ProjectedFace[]): { minX: number; maxX: number; minY: number; maxY: number } | null {
+	if (faces.length === 0) return null;
+	let minX = Infinity, maxX = -Infinity;
+	let minY = Infinity, maxY = -Infinity;
+	for (let i = 0; i < faces.length; i++) {
+		const vs = faces[i].vertices;
+		for (let k = 0; k < vs.length; k++) {
+			const v = vs[k];
+			if (v.x < minX) minX = v.x;
+			if (v.x > maxX) maxX = v.x;
+			if (v.y < minY) minY = v.y;
+			if (v.y > maxY) maxY = v.y;
+		}
+	}
+	return { minX, maxX, minY, maxY };
 }
 
 /**
- * Scale and center projected coordinates to fit in canvas
+ * Scale and center projected coordinates to fit in canvas.
+ * Reuses uv/textureRef/normal references (no deep clone); only vertices are new.
  */
 export function fitToCanvas(
 	faces: ProjectedFace[],
@@ -97,36 +118,36 @@ export function fitToCanvas(
 ): ProjectedFace[] {
 	if (faces.length === 0) return faces;
 
-	// Find bounds
-	let minX = Infinity, maxX = -Infinity;
-	let minY = Infinity, maxY = -Infinity;
+	const b = computeBounds(faces);
+	if (!b) return faces;
 
-	for (const face of faces) {
-		for (const v of face.vertices) {
-			minX = Math.min(minX, v.x);
-			maxX = Math.max(maxX, v.x);
-			minY = Math.min(minY, v.y);
-			maxY = Math.max(maxY, v.y);
-		}
-	}
-
-	const width = maxX - minX;
-	const height = maxY - minY;
-	const maxDim = Math.max(width, height);
+	const width = b.maxX - b.minX;
+	const height = b.maxY - b.minY;
+	const maxDim = width > height ? width : height;
 
 	if (maxDim === 0) return faces;
 
 	const scale = (canvasSize - padding * 2) / maxDim;
-	const offsetX = (canvasSize - width * scale) / 2 - minX * scale;
-	const offsetY = (canvasSize - height * scale) / 2 - minY * scale;
+	const offsetX = (canvasSize - width * scale) / 2 - b.minX * scale;
+	const offsetY = (canvasSize - height * scale) / 2 - b.minY * scale;
 
-	return faces.map(face => ({
-		...face,
-		vertices: face.vertices.map(v => ({
-			x: v.x * scale + offsetX,
-			y: v.y * scale + offsetY
-		}))
-	}));
+	const out: ProjectedFace[] = new Array<ProjectedFace>(faces.length);
+	for (let i = 0; i < faces.length; i++) {
+		const face = faces[i];
+		const vs = face.vertices;
+		const nv: ProjectedVertex[] = new Array<ProjectedVertex>(vs.length);
+		for (let k = 0; k < vs.length; k++) {
+			nv[k] = { x: vs[k].x * scale + offsetX, y: vs[k].y * scale + offsetY };
+		}
+		out[i] = {
+			vertices: nv,
+			uv: face.uv,
+			textureRef: face.textureRef,
+			avgDepth: face.avgDepth,
+			normal: face.normal
+		};
+	}
+	return out;
 }
 
 /**
@@ -136,12 +157,14 @@ export function calculateBounds(faces: ProjectedFace[]): { minX: number; maxX: n
 	let minX = Infinity, maxX = -Infinity;
 	let minY = Infinity, maxY = -Infinity;
 
-	for (const face of faces) {
-		for (const v of face.vertices) {
-			minX = Math.min(minX, v.x);
-			maxX = Math.max(maxX, v.x);
-			minY = Math.min(minY, v.y);
-			maxY = Math.max(maxY, v.y);
+	for (let i = 0; i < faces.length; i++) {
+		const vs = faces[i].vertices;
+		for (let k = 0; k < vs.length; k++) {
+			const v = vs[k];
+			if (v.x < minX) minX = v.x;
+			if (v.x > maxX) maxX = v.x;
+			if (v.y < minY) minY = v.y;
+			if (v.y > maxY) maxY = v.y;
 		}
 	}
 

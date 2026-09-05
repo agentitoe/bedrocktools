@@ -7,40 +7,109 @@
 
 const MONACO_VERSION = "0.52.2";
 const MONACO_VS = `https://cdn.jsdelivr.net/npm/monaco-editor@${MONACO_VERSION}/min/vs`;
+const MONACO_ORIGIN = "https://cdn.jsdelivr.net";
 
-let monacoPromise: Promise<any> | null = null;
+let monacoPromise: Promise<unknown> | null = null;
 let languagesRegistered = false;
 
-export function loadMonaco(): Promise<any> {
-	const w = window as any;
-	if (w.monaco) return Promise.resolve(w.monaco);
+/** Minimal Monaco surface used by the editor (typed as unknown externally). */
+export interface MonacoInstance {
+	editor: {
+		create: (mount: HTMLElement, options: Record<string, unknown>) => MonacoEditor;
+		setTheme: (theme: string) => void;
+	};
+	languages: {
+		register: (lang: { id: string }) => void;
+		setMonarchTokensProvider: (id: string, provider: unknown) => void;
+		setLanguageConfiguration: (id: string, config: unknown) => void;
+	};
+}
+
+export interface MonacoEditor {
+	getValue: () => string;
+	dispose: () => void;
+	onDidChangeModelContent: (cb: () => void) => void;
+	focus: () => void;
+}
+
+function isMonacoInstance(v: unknown): v is MonacoInstance {
+	if (!v || typeof v !== "object") return false;
+	const m = v as Record<string, unknown>;
+	return (
+		typeof m["editor"] === "object" &&
+		m["editor"] !== null &&
+		typeof (m["editor"] as Record<string, unknown>)["create"] === "function" &&
+		typeof m["languages"] === "object" &&
+		m["languages"] !== null
+	);
+}
+
+function ensurePreconnect(): void {
+	try {
+		if (typeof document === "undefined") return;
+		const head = document.head;
+		if (!head) return;
+		if (head.querySelector(`link[rel="preconnect"][href="${MONACO_ORIGIN}"]`)) return;
+		const link = document.createElement("link");
+		link.rel = "preconnect";
+		link.href = MONACO_ORIGIN;
+		link.crossOrigin = "anonymous";
+		head.appendChild(link);
+	} catch {
+		// ignore (non-DOM / test env)
+	}
+}
+
+export function loadMonaco(): Promise<unknown> {
+	const w = window as unknown as Record<string, unknown>;
+	if (isMonacoInstance(w["monaco"])) return Promise.resolve(w["monaco"]);
 	if (monacoPromise) return monacoPromise;
 
-	monacoPromise = new Promise((resolve, reject) => {
-		const require = w.require;
-		if (!require) {
+	ensurePreconnect();
+
+	const p: Promise<unknown> = new Promise((resolve, reject) => {
+		const req = w["require"] as
+			| { config: (opts: unknown) => void; (mods: string[], ok: () => void, err: (e: unknown) => void): void }
+			| undefined;
+		if (typeof req !== "function") {
 			reject(new Error("Monaco loader not available"));
 			return;
 		}
-		require.config({ paths: { vs: MONACO_VS } });
-		require(
+		try {
+			req.config({ paths: { vs: MONACO_VS } });
+		} catch (e) {
+			reject(e instanceof Error ? e : new Error(String(e)));
+			return;
+		}
+		req(
 			["vs/editor/editor.main"],
 			() => {
-				if (!w.monaco) {
+				const monaco = (window as unknown as Record<string, unknown>)["monaco"];
+				if (!isMonacoInstance(monaco)) {
 					reject(new Error("Monaco failed to load"));
 					return;
 				}
-				registerBedrockLanguages(w.monaco);
-				resolve(w.monaco);
+				try {
+					registerBedrockLanguages(monaco);
+				} catch {
+					// non-fatal
+				}
+				resolve(monaco);
 			},
 			(err: unknown) => reject(err instanceof Error ? err : new Error(String(err)))
 		);
 	});
 
+	monacoPromise = p;
+	// Reset the cached promise on rejection so a later call retries.
+	p.then(undefined, () => {
+		if (monacoPromise === p) monacoPromise = null;
+	});
+
 	return monacoPromise;
 }
 
-function registerBedrockLanguages(monaco: any): void {
+function registerBedrockLanguages(monaco: MonacoInstance): void {
 	if (languagesRegistered) return;
 	languagesRegistered = true;
 
@@ -89,19 +158,31 @@ function registerBedrockLanguages(monaco: any): void {
 	});
 }
 
+/** Extension -> Monaco language id (longest/specific first via exact ext match). */
+const EXT_LANG = new Map<string, string>([
+	[".mcfunction", "mcfunction"],
+	[".molang", "molang"],
+	[".mcmeta", "json"],
+	[".json", "json"],
+	[".js", "javascript"],
+	[".ts", "typescript"],
+	[".lang", "ini"],
+	[".properties", "ini"],
+	[".ini", "ini"],
+	[".css", "css"],
+	[".html", "html"],
+	[".htm", "html"],
+	[".md", "plaintext"],
+	[".txt", "plaintext"],
+]);
+
 /** Map a file path to a Monaco language id. */
 export function languageForPath(path: string): string {
 	const lower = path.toLowerCase();
-	if (lower.endsWith(".json") || lower.endsWith(".mcmeta")) return "json";
-	if (lower.endsWith(".js")) return "javascript";
-	if (lower.endsWith(".ts")) return "typescript";
-	if (lower.endsWith(".mcfunction")) return "mcfunction";
-	if (lower.endsWith(".molang")) return "molang";
-	if (lower.endsWith(".lang") || lower.endsWith(".properties") || lower.endsWith(".ini")) return "ini";
-	if (lower.endsWith(".css")) return "css";
-	if (lower.endsWith(".html") || lower.endsWith(".htm")) return "html";
-	if (lower.endsWith(".md") || lower.endsWith(".txt")) return "plaintext";
-	return "plaintext";
+	const dot = lower.lastIndexOf(".");
+	if (dot === -1) return "plaintext";
+	const ext = lower.slice(dot);
+	return EXT_LANG.get(ext) ?? "plaintext";
 }
 
 const BINARY_EXTS = new Set([
@@ -124,7 +205,7 @@ export function isBinary(path: string, data: Uint8Array): boolean {
 	if (TEXT_EXTS.has(ext)) return false;
 
 	// Unknown extension: treat as binary if it contains NUL bytes up front.
-	const n = Math.min(data.length, 1024);
+	const n = data.length < 1024 ? data.length : 1024;
 	for (let i = 0; i < n; i++) {
 		if (data[i] === 0) return true;
 	}

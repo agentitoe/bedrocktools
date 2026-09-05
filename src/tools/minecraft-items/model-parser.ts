@@ -1,5 +1,7 @@
 // Minecraft Model Parser
-// Parses Minecraft model JSON into renderable geometry for isometric rendering
+// Parses Minecraft model JSON into renderable geometry for isometric rendering.
+// Optimized: bounded LRU (150 raw / 500 resolved), inflight fetch dedupe,
+// precompiled regex, visited-set cycle guard. Projection math untouched.
 
 export interface Vec3 {
 	x: number;
@@ -57,21 +59,55 @@ export interface ResolvedModel {
 	};
 }
 
-// Cache for fetched models
-const modelCache = new Map<string, any>();
+// ---- Bounded LRU caches ----
+
+const MODEL_CACHE_CAP = 150;
+const RESOLVED_CACHE_CAP = 500;
+
+const modelCache = new Map<string, unknown>();
 const resolvedCache = new Map<string, ResolvedModel>();
+const modelInflight = new Map<string, Promise<unknown>>();
+const resolvedInflight = new Map<string, Promise<ResolvedModel | null>>();
+
+function lruSet<K, V>(map: Map<K, V>, key: K, value: V, cap: number): void {
+	if (map.has(key)) map.delete(key);
+	map.set(key, value);
+	if (map.size > cap) {
+		const oldest = map.keys().next();
+		if (!oldest.done) map.delete(oldest.value);
+	}
+}
+
+function lruGet<K, V>(map: Map<K, V>, key: K): V | undefined {
+	const v = map.get(key);
+	if (v === undefined) return undefined;
+	map.delete(key);
+	map.set(key, v);
+	return v;
+}
 
 const MODEL_BASE = '/data/models/block';
 const ALL_MODELS_URL = '/data/models/all.json';
 
-let allModelsPromise: Promise<Record<string, any>> | null = null;
+let allModelsPromise: Promise<Record<string, unknown>> | null = null;
+
+// Precompiled patterns (avoid re-compiling per model/texture).
+const MC_PREFIX_RE = /^minecraft:/;
+const BLOCK_ITEM_DIR_RE = /^(block|item)\//;
+const PARENT_MC_BLOCK_RE = /^minecraft:block\//;
+const PARENT_BLOCK_RE = /^block\//;
 
 /** Load the combined model bundle once (all block models in a single request). */
-async function getAllModels(): Promise<Record<string, any>> {
+async function getAllModels(): Promise<Record<string, unknown>> {
 	if (!allModelsPromise) {
-		allModelsPromise = fetch(ALL_MODELS_URL)
+		allModelsPromise = fetch(ALL_MODELS_URL, { cache: 'force-cache' } as RequestInit)
 			.then((res) => (res.ok ? res.json() : Promise.resolve({})))
-			.catch(() => ({} as Record<string, any>));
+			.catch(() => ({} as Record<string, unknown>));
+		// Allow retry if the bundle fetch itself rejects at the network layer
+		// (the catch above already converts to {}, so this is a safety net).
+		allModelsPromise.catch(() => {
+			allModelsPromise = null;
+		});
 	}
 	return allModelsPromise;
 }
@@ -79,54 +115,88 @@ async function getAllModels(): Promise<Record<string, any>> {
 /**
  * Fetch a model JSON from the local data directory (via the combined bundle,
  * falling back to an individual file if the bundle is unavailable).
+ * Dedupes concurrent fetches for the same name.
  */
-async function fetchModel(name: string): Promise<any> {
-	if (modelCache.has(name)) return modelCache.get(name);
+async function fetchModel(name: string): Promise<unknown> {
+	const cached = lruGet(modelCache, name);
+	if (cached !== undefined) return cached;
+	const inflight = modelInflight.get(name);
+	if (inflight) return inflight;
 
-	const all = await getAllModels();
-	if (all[name]) {
-		modelCache.set(name, all[name]);
-		return all[name];
-	}
-
-	try {
-		const res = await fetch(`${MODEL_BASE}/${name}.json`);
-		if (!res.ok) {
-			console.warn(`fetchModel: ${name} returned ${res.status}`);
+	const p = (async (): Promise<unknown> => {
+		try {
+			const all = await getAllModels();
+			const bundled = (all as Record<string, unknown>)[name];
+			if (bundled !== undefined) {
+				lruSet(modelCache, name, bundled, MODEL_CACHE_CAP);
+				return bundled;
+			}
+		} catch {
+			// Fall through to individual file.
+		}
+		try {
+			const res = await fetch(`${MODEL_BASE}/${name}.json`, { cache: 'force-cache' } as RequestInit);
+			if (!res.ok) {
+				return null;
+			}
+			const data: unknown = await res.json();
+			lruSet(modelCache, name, data, MODEL_CACHE_CAP);
+			return data;
+		} catch (e) {
+			console.error(`fetchModel error for ${name}:`, e);
 			return null;
 		}
-		const data = await res.json();
-		modelCache.set(name, data);
-		return data;
-	} catch (e) {
-		console.error(`fetchModel error for ${name}:`, e);
-		return null;
+	})();
+
+	modelInflight.set(name, p);
+	try {
+		return await p;
+	} finally {
+		modelInflight.delete(name);
 	}
 }
 
+interface RawModel {
+	parent?: unknown;
+	textures?: unknown;
+	elements?: Element[];
+	display?: ParsedModel['display'];
+}
+
 /**
- * Recursively resolve a model including its parent
+ * Recursively resolve a model including its parent.
+ * `visited` guards against parent cycles (A -> B -> A).
  */
-async function resolveModel(name: string, textures: Record<string, string> = {}): Promise<ParsedModel | null> {
-	const model = await fetchModel(name);
-	if (!model) {
-		console.warn(`[resolveModel] fetchModel returned null for ${name}`);
+async function resolveModel(
+	name: string,
+	textures: Record<string, string> = {},
+	visited: Set<string> = new Set<string>()
+): Promise<ParsedModel | null> {
+	if (visited.has(name)) return null;
+	visited.add(name);
+
+	const raw = (await fetchModel(name)) as RawModel | null;
+	if (!raw) {
 		return null;
 	}
+	const model = raw;
 
 	// Merge textures from this model
-	const mergedTextures = { ...textures };
-	if (model.textures) {
-		for (const [key, value] of Object.entries(model.textures) as [string, any][]) {
-			if (typeof value === 'string' && value.startsWith('#')) {
+	const mergedTextures: Record<string, string> = { ...textures };
+	if (model.textures && typeof model.textures === 'object') {
+		const entries = Object.entries(model.textures as Record<string, unknown>);
+		for (let i = 0; i < entries.length; i++) {
+			const key = entries[i][0];
+			const value = entries[i][1];
+			if (typeof value === 'string' && value.charCodeAt(0) === 35 /* # */) {
 				// Resolve texture references like #bottom, #texture
 				const ref = value.slice(1);
 				mergedTextures[key] = mergedTextures[ref] || value;
-			} else if (value && typeof value === 'object' && typeof value.sprite === 'string') {
+			} else if (value && typeof value === 'object' && typeof (value as { sprite?: unknown }).sprite === 'string') {
 				// New 26.1 format: { "sprite": "minecraft:block/foo", ... }
-				mergedTextures[key] = value.sprite;
-			} else {
-				mergedTextures[key] = value as string;
+				mergedTextures[key] = (value as { sprite: string }).sprite;
+			} else if (typeof value === 'string') {
+				mergedTextures[key] = value;
 			}
 		}
 	}
@@ -135,13 +205,15 @@ async function resolveModel(name: string, textures: Record<string, string> = {})
 	let parentElements: Element[] = [];
 	let parentDisplay: ParsedModel['display'] | null = null;
 	let parentTextures: Record<string, string> = {};
-	if (model.parent) {
-		const parentName = model.parent.replace('minecraft:block/', '').replace('block/', '');
-		const parent = await resolveModel(parentName, mergedTextures);
-		if (parent) {
-			parentElements = parent.elements;
-			parentDisplay = parent.display;
-			parentTextures = parent.textures;
+	if (typeof model.parent === 'string' && model.parent) {
+		const parentName = model.parent.replace(PARENT_MC_BLOCK_RE, '').replace(PARENT_BLOCK_RE, '');
+		if (parentName && !visited.has(parentName)) {
+			const parent = await resolveModel(parentName, mergedTextures, visited);
+			if (parent) {
+				parentElements = parent.elements;
+				parentDisplay = parent.display;
+				parentTextures = parent.textures;
+			}
 		}
 	}
 
@@ -164,6 +236,7 @@ async function resolveModel(name: string, textures: Record<string, string> = {})
 
 /**
  * Apply rotation to a vertex around origin
+ * MATH UNTOUCHED — do not modify projection math.
  */
 function rotateVertex(v: Vec3, rx: number, ry: number, rz: number): Vec3 {
 	// Convert to radians
@@ -205,6 +278,7 @@ function rotateVertex(v: Vec3, rx: number, ry: number, rz: number): Vec3 {
 
 /**
  * Apply display transform to a vertex
+ * MATH UNTOUCHED.
  */
 function applyDisplayTransform(v: Vec3, transform: DisplayTransform): Vec3 {
 	// Translate to origin centered (8,8,8)
@@ -251,6 +325,7 @@ function getFaceNormal(faceName: string): Vec3 {
 
 /**
  * Get vertices for a face of a cuboid
+ * MATH UNTOUCHED.
  */
 function getFaceVertices(element: Element, faceName: string): Vec3[] {
 	const { from, to } = element;
@@ -319,15 +394,15 @@ function getFaceVertices(element: Element, faceName: string): Vec3[] {
  */
 function normalizeTextureName(name: string): string {
 	return name
-		.replace(/^minecraft:/, '')
-		.replace(/^(block|item)\//, '');
+		.replace(MC_PREFIX_RE, '')
+		.replace(BLOCK_ITEM_DIR_RE, '');
 }
 
 /**
  * Resolve texture reference (#bottom -> actual texture name)
  */
 function resolveTextureRef(ref: string, textures: Record<string, string>): string {
-	if (ref.startsWith('#')) {
+	if (ref.charCodeAt(0) === 35 /* # */) {
 		const key = ref.slice(1);
 		return textures[key] ? normalizeTextureName(textures[key]) : normalizeTextureName(key);
 	}
@@ -345,6 +420,7 @@ function resolveTextureRef(ref: string, textures: Record<string, string>): strin
  * the face's 4 corners so the texture appears upright when the face is viewed
  * from outside the block. The vertex order from getFaceVertices is clockwise
  * when viewed from outside, so each face needs its own corner mapping.
+ * MATH UNTOUCHED.
  */
 function parseUV(uv: number[] | undefined, faceName: string, element: Element, rotation: number = 0): UV[] {
 	const { from, to } = element;
@@ -430,54 +506,73 @@ function parseUV(uv: number[] | undefined, faceName: string, element: Element, r
 }
 
 /**
- * Main function: parse a model name into resolved faces ready for rendering
+ * Main function: parse a model name into resolved faces ready for rendering.
+ * Dedupes concurrent parses for the same model.
  */
 export async function parseModel(modelName: string): Promise<ResolvedModel | null> {
 	// Check cache first
-	if (resolvedCache.has(modelName)) return resolvedCache.get(modelName)!;
+	const hit = lruGet(resolvedCache, modelName);
+	if (hit !== undefined) return hit;
+	const inflight = resolvedInflight.get(modelName);
+	if (inflight) return inflight;
 
-	const parsed = await resolveModel(modelName);
-	if (!parsed) {
-		console.warn(`parseModel: resolveModel returned null for ${modelName}`);
-		return null;
-	}
-
-	const faces: Face[] = [];
-	const guiTransform = parsed.display.gui || DEFAULT_GUI_TRANSFORM;
-
-	for (const element of parsed.elements) {
-		for (const [faceName, faceData] of Object.entries(element.faces)) {
-			const vertices = getFaceVertices(element, faceName);
-			if (vertices.length !== 4) continue;
-
-			// Apply display transform to each vertex
-			const transformedVertices = vertices.map(v => applyDisplayTransform(v, guiTransform));
-
-			const textureRef = resolveTextureRef(faceData.texture, parsed.textures);
-			const uv = parseUV(faceData.uv, faceName, element, faceData.rotation);
-			const normal = getFaceNormal(faceName);
-
-			faces.push({
-				vertices: transformedVertices,
-				uv,
-				textureRef,
-				normal
-			});
+	const p = (async (): Promise<ResolvedModel | null> => {
+		const parsed = await resolveModel(modelName);
+		if (!parsed) {
+			return null;
 		}
+
+		const faces: Face[] = [];
+		const guiTransform = parsed.display.gui || DEFAULT_GUI_TRANSFORM;
+
+		const elements = parsed.elements;
+		for (let ei = 0; ei < elements.length; ei++) {
+			const element = elements[ei];
+			const faceEntries = Object.entries(element.faces);
+			for (let fi = 0; fi < faceEntries.length; fi++) {
+				const faceName = faceEntries[fi][0];
+				const faceData = faceEntries[fi][1];
+				const vertices = getFaceVertices(element, faceName);
+				if (vertices.length !== 4) continue;
+
+				// Apply display transform to each vertex
+				const v0 = applyDisplayTransform(vertices[0], guiTransform);
+				const v1 = applyDisplayTransform(vertices[1], guiTransform);
+				const v2 = applyDisplayTransform(vertices[2], guiTransform);
+				const v3 = applyDisplayTransform(vertices[3], guiTransform);
+
+				const textureRef = resolveTextureRef(faceData.texture, parsed.textures);
+				const uv = parseUV(faceData.uv, faceName, element, faceData.rotation);
+				const normal = getFaceNormal(faceName);
+
+				faces.push({
+					vertices: [v0, v1, v2, v3],
+					uv,
+					textureRef,
+					normal
+				});
+			}
+		}
+
+		if (faces.length === 0) {
+			return null;
+		}
+
+		const result: ResolvedModel = {
+			faces,
+			display: parsed.display
+		};
+
+		lruSet(resolvedCache, modelName, result, RESOLVED_CACHE_CAP);
+		return result;
+	})();
+
+	resolvedInflight.set(modelName, p);
+	try {
+		return await p;
+	} finally {
+		resolvedInflight.delete(modelName);
 	}
-
-	if (faces.length === 0) {
-		console.warn(`parseModel: no faces generated for ${modelName}`);
-		return null;
-	}
-
-	const result: ResolvedModel = {
-		faces,
-		display: parsed.display
-	};
-
-	resolvedCache.set(modelName, result);
-	return result;
 }
 
 /**
@@ -526,4 +621,7 @@ export function getInventoryModelName(blockName: string): string {
 export function clearModelCache() {
 	modelCache.clear();
 	resolvedCache.clear();
+	modelInflight.clear();
+	resolvedInflight.clear();
+	allModelsPromise = null;
 }

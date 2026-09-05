@@ -1,6 +1,6 @@
 import type { ItemData, RecipeData, RecipeType } from './types';
 import { translations } from './translations';
-import { currentLang, getItemById, getItemByDisplayName, getItemName, getRecipeForItem, isBlockItem } from './data';
+import { currentLang, getItemById, getItemByDisplayName, getItemName, getRecipeForItem, isBlockItem, allRecipes } from './data';
 import { createImgTag } from './images';
 
 export type RecipeCategory = 'crafting' | 'smelting' | 'blasting' | 'smoking' | 'campfire_cooking' | 'stonecutting' | 'smithing' | 'brewing';
@@ -44,6 +44,57 @@ const RECIPE_CATEGORY_ICONS: Record<RecipeCategory, string> = {
 	brewing: '🧪',
 };
 
+// ---- Recipe index: Map<resultId, recipe[]> built once per allRecipes identity ----
+
+let recipeIndexCache: Map<number, RecipeData[]> | null = null;
+let recipeIndexSource: Record<number, RecipeData[]> | null = null;
+
+function getRecipeIndex(): Map<number, RecipeData[]> {
+	if (recipeIndexCache && recipeIndexSource === allRecipes) return recipeIndexCache;
+	const m = new Map<number, RecipeData[]>();
+	for (const key of Object.keys(allRecipes)) {
+		const id = Number(key);
+		if (!Number.isFinite(id)) continue;
+		const list = allRecipes[id];
+		if (Array.isArray(list)) m.set(id, list);
+	}
+	recipeIndexCache = m;
+	recipeIndexSource = allRecipes;
+	return m;
+}
+
+/** Invalidate the memoised recipe index (called implicitly via identity check). */
+export function invalidateRecipeIndex(): void {
+	recipeIndexCache = null;
+	recipeIndexSource = null;
+}
+
+function getIndexedRecipes(itemId: number): RecipeData[] | null {
+	// Fast path: direct record lookup; index kept for reverse/iteration use.
+	const direct = getRecipeForItem(itemId);
+	if (direct) return direct;
+	return getRecipeIndex().get(itemId) ?? null;
+}
+
+// ---- Potion label memo (brewing chain does repeated displayName lookups) ----
+
+const potionItemCache = new Map<string, ItemData | undefined>();
+
+function potionEntryItem(label: string): ItemData | undefined {
+	let hit = potionItemCache.get(label);
+	if (hit !== undefined || potionItemCache.has(label)) return hit;
+	hit = getItemByDisplayName(label);
+	// Bound the memo to avoid unbounded growth on adversarial labels.
+	if (potionItemCache.size > 1000) potionItemCache.clear();
+	potionItemCache.set(label, hit);
+	return hit;
+}
+
+/** Memoised potion label lookup (exported for testing/perf). */
+export function potionEntryLabel(label: string): ItemData | undefined {
+	return potionEntryItem(label);
+}
+
 function createRecipeSlot(id: number | null | undefined, size: number): HTMLDivElement {
 	const slot = document.createElement('div');
 	slot.className = 'recipe-slot';
@@ -71,16 +122,21 @@ function createRecipeArrow(): HTMLSpanElement {
 	return arrow;
 }
 
+void createRecipeArrow;
+
 function normalizeCraftingCells(recipe: RecipeData): Array<number | null> {
 	const cells: Array<number | null> = new Array(9).fill(null);
 	if (recipe.type === 'crafting_shapeless') {
 		const ingredients = recipe.ingredients || [];
-		for (let i = 0; i < Math.min(9, ingredients.length); i++) cells[i] = ingredients[i];
+		const n = ingredients.length < 9 ? ingredients.length : 9;
+		for (let i = 0; i < n; i++) cells[i] = ingredients[i];
 	} else {
 		const shape = recipe.inShape || [];
-		for (let r = 0; r < Math.min(3, shape.length); r++) {
+		const rows = shape.length < 3 ? shape.length : 3;
+		for (let r = 0; r < rows; r++) {
 			const row = shape[r] || [];
-			for (let c = 0; c < Math.min(3, row.length); c++) cells[r * 3 + c] = row[c] ?? null;
+			const cols = row.length < 3 ? row.length : 3;
+			for (let c = 0; c < cols; c++) cells[r * 3 + c] = row[c] ?? null;
 		}
 	}
 	return cells;
@@ -191,7 +247,8 @@ function renderBrewingChain(recipe: RecipeData): HTMLDivElement {
 		? recipe.steps
 		: (recipe.ingredient != null ? [{ ingredient: recipe.ingredient, baseLabel: recipe.baseLabel || '', resultLabel: recipe.resultLabel || '' }] : []);
 
-	for (const [i, step] of steps.entries()) {
+	for (let i = 0; i < steps.length; i++) {
+		const step = steps[i];
 		const panel = document.createElement('div');
 		panel.className = 'recipe-gui gui-brewing';
 
@@ -204,8 +261,8 @@ function renderBrewingChain(recipe: RecipeData): HTMLDivElement {
 		// Ingredient (top slot).
 		panel.appendChild(createGuiSlot(step.ingredient, 32, 79, 17));
 
-		// Base potion (left bottle).
-		const baseItem = getItemByDisplayName(step.baseLabel);
+		// Base potion (left bottle) — memoised lookup.
+		const baseItem = potionEntryItem(step.baseLabel);
 		if (baseItem) panel.appendChild(createGuiSlot(baseItem.id, 32, 56, 51));
 		else panel.appendChild(createGuiLabelSlot(step.baseLabel, 56, 51));
 
@@ -217,8 +274,8 @@ function renderBrewingChain(recipe: RecipeData): HTMLDivElement {
 		arrow.style.top = `calc(var(--s) * 51px)`;
 		panel.appendChild(arrow);
 
-		// Result potion (right bottle).
-		const resultItem = getItemByDisplayName(step.resultLabel);
+		// Result potion (right bottle) — memoised lookup.
+		const resultItem = potionEntryItem(step.resultLabel);
 		if (resultItem) panel.appendChild(createGuiSlot(resultItem.id, 32, 102, 51));
 		else panel.appendChild(createGuiLabelSlot(step.resultLabel, 102, 51));
 
@@ -288,20 +345,26 @@ function buildModalHeader(item: ItemData): HTMLDivElement {
 }
 
 function attachModalClose(modal: HTMLElement) {
-	modal.querySelector('.modal-close')?.addEventListener('click', () => modal.remove());
-	modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+	let closed = false;
 	const handleEsc = (e: KeyboardEvent) => {
-		if (e.key === 'Escape') {
-			modal.remove();
-			document.removeEventListener('keydown', handleEsc);
-		}
+		if (e.key === 'Escape') closeModal();
 	};
+	function closeModal(): void {
+		if (closed) return;
+		closed = true;
+		document.removeEventListener('keydown', handleEsc);
+		if (modal.isConnected) modal.remove();
+	}
+	modal.querySelector('.modal-close')?.addEventListener('click', closeModal);
+	modal.addEventListener('click', (e) => {
+		if (e.target === modal) closeModal();
+	});
 	document.addEventListener('keydown', handleEsc);
 }
 
 export function renderRecipeModal(item: ItemData) {
 	const t = translations[currentLang];
-	const recipes = getRecipeForItem(item.id);
+	const recipes = getIndexedRecipes(item.id);
 	const isBlock = isBlockItem(item.id);
 
 	const modal = document.createElement('div');
@@ -332,8 +395,12 @@ export function renderRecipeModal(item: ItemData) {
 		const grouped = new Map<RecipeCategory, RecipeData[]>();
 		for (const recipe of recipes) {
 			const cat = getRecipeCategory(recipe.type);
-			if (!grouped.has(cat)) grouped.set(cat, []);
-			grouped.get(cat)!.push(recipe);
+			let list = grouped.get(cat);
+			if (!list) {
+				list = [];
+				grouped.set(cat, list);
+			}
+			list.push(recipe);
 		}
 
 		for (const cat of categoryOrder) {

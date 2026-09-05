@@ -6,37 +6,9 @@
 import { encodeUtf8 } from "../../shared/encoding";
 import type { FileMap } from "./pack";
 import { sanitizeName } from "./pack";
+import { uuid } from "../recipe-creator/util";
 
 export type TemplateKind = "behavior" | "resource" | "addon";
-
-function uuid(): string {
-	try {
-		if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-			return crypto.randomUUID();
-		}
-		if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
-			const bytes = new Uint8Array(16);
-			crypto.getRandomValues(bytes);
-			bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
-			bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
-			const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-			return (
-				hex.slice(0, 8) +
-				"-" +
-				hex.slice(8, 12) +
-				"-" +
-				hex.slice(12, 16) +
-				"-" +
-				hex.slice(16, 20) +
-				"-" +
-				hex.slice(20)
-			);
-		}
-	} catch {
-		// Fall through to error below.
-	}
-	throw new Error("Secure random UUID generation is not available in this environment.");
-}
 
 function manifestJson(type: "data" | "resources", name: string, description: string): string {
 	const m = {

@@ -1,6 +1,13 @@
 // Static option data for the /give Command Generator.
 // Values are Minecraft identifiers/terms, so they stay in English on every
 // language of the site (same convention as the game itself).
+//
+// Performance notes:
+// - `Set` views of the option lists give O(1) membership checks for validation.
+// - The item catalogue index (`setCatalogue` / `getById` / `getByName`) avoids
+//   linear `Array.find` scans in the picker and preview paths.
+
+import type { ItemData } from './types';
 
 export const ENCHANTMENTS = [
 	'sharpness', 'smite', 'bane_of_arthropods', 'knockback', 'fire_aspect',
@@ -129,3 +136,54 @@ export const BEDROCK_COMMON_BLOCKS = [
 	'oak_planks', 'oak_log', 'glass', 'obsidian', 'bedrock', 'chest',
 	'crafting_table', 'furnace', 'wool', 'concrete', 'deepslate', 'tnt',
 ];
+
+// ---- O(1) membership Sets (same contents as the lists above) ----
+
+export const ENCHANTMENT_SET: ReadonlySet<string> = new Set(ENCHANTMENTS);
+export const ATTRIBUTE_SET: ReadonlySet<string> = new Set(ATTRIBUTES);
+export const ATTRIBUTE_SLOT_SET: ReadonlySet<string> = new Set(ATTRIBUTE_SLOTS);
+export const ATTRIBUTE_OPERATION_SET: ReadonlySet<string> = new Set(ATTRIBUTE_OPERATIONS);
+export const RARITY_SET: ReadonlySet<string> = new Set(RARITIES);
+export const MC_COLOR_SET: ReadonlySet<string> = new Set(MC_COLORS);
+export const DYE_COLOR_SET: ReadonlySet<string> = new Set(DYE_COLORS);
+export const EFFECT_SET: ReadonlySet<string> = new Set(EFFECTS);
+export const POTION_SET: ReadonlySet<string> = new Set(POTIONS);
+export const FIREWORK_SHAPE_SET: ReadonlySet<string> = new Set(FIREWORK_SHAPES);
+export const SELECTOR_SET: ReadonlySet<string> = new Set(PLAYER_SELECTORS);
+
+// ---- Item catalogue index (replaces linear Array.find scans) ----
+
+let catalogueById = new Map<number, ItemData>();
+let catalogueByName = new Map<string, ItemData>();
+
+/**
+ * (Re)build the catalogue lookup Maps. Call once per `loadItems()` with the
+ * full vanilla list plus once more when synthetic potion items are appended.
+ * Lookups below are O(1); the source arrays stay untouched for iteration.
+ */
+export function setCatalogue(items: readonly ItemData[]): void {
+	const byId = new Map<number, ItemData>();
+	const byName = new Map<string, ItemData>();
+	for (const item of items) {
+		if (!byId.has(item.id)) byId.set(item.id, item);
+		const key = item.name.toLowerCase();
+		if (!byName.has(key)) byName.set(key, item);
+	}
+	catalogueById = byId;
+	catalogueByName = byName;
+}
+
+/** O(1) lookup by numeric catalogue id. */
+export function catalogueGetById(id: number): ItemData | undefined {
+	return catalogueById.get(id);
+}
+
+/** O(1) lookup by bare item name (case-insensitive, no `minecraft:` prefix). */
+export function catalogueGetByName(bareName: string): ItemData | undefined {
+	return catalogueByName.get(bareName.toLowerCase());
+}
+
+/** Number of indexed catalogue entries (mainly useful for tests). */
+export function catalogueSize(): number {
+	return catalogueById.size;
+}

@@ -21,82 +21,129 @@ function t() {
 	return translations[getLang()];
 }
 
+/** Minecraft world-border limit for X/Y/Z validation. */
+const MAX_COORD = 30_000_000;
+
+/** World-border + finiteness guard: rejects NaN/Infinity and out-of-range input. */
+export function isValidCoord(n: number): boolean {
+	return Number.isFinite(n) && Math.abs(n) <= MAX_COORD;
+}
+
+function showError(resultDiv: HTMLElement, message: string): void {
+	resultDiv.textContent = "";
+	const box = document.createElement("div");
+	box.className = "result-error";
+	box.textContent = message;
+	resultDiv.appendChild(box);
+}
+
+function coordRow(doc: Document, label: string, value: number): HTMLSpanElement {
+	const row = doc.createElement("span");
+	row.className = "result-coord";
+	const lab = doc.createElement("span");
+	lab.className = "result-coord-label";
+	lab.textContent = label + ":";
+	const val = doc.createElement("span");
+	val.className = "result-coord-value";
+	val.textContent = String(formatCoord(value));
+	row.append(lab, val);
+	return row;
+}
+
+function resultColumn(
+	doc: Document,
+	title: string,
+	x: number,
+	y: number,
+	z: number,
+	tr: ReturnType<typeof t>,
+): HTMLDivElement {
+	const col = doc.createElement("div");
+	col.className = "result-column";
+	const strong = doc.createElement("strong");
+	strong.textContent = title;
+	const coords = doc.createElement("div");
+	coords.className = "result-coords";
+	coords.append(
+		coordRow(doc, tr.xLabel, x),
+		coordRow(doc, tr.yLabel, y),
+		coordRow(doc, tr.zLabel, z),
+	);
+	col.append(strong, coords);
+	return col;
+}
+
 function initCalculator(): void {
 	initUi(translations);
 
 	const form = document.getElementById('coordForm') as HTMLFormElement | null;
 	const resultDiv = document.getElementById('result');
-	if (!form || !resultDiv) return;
+	const inputX = document.getElementById('coordX') as HTMLInputElement | null;
+	const inputY = document.getElementById('coordY') as HTMLInputElement | null;
+	const inputZ = document.getElementById('coordZ') as HTMLInputElement | null;
+	if (!form || !resultDiv || !inputX || !inputY || !inputZ) return;
 
 	form.addEventListener('submit', (e) => {
 		e.preventDefault();
 
-		const x = parseFloat((document.getElementById('coordX') as HTMLInputElement).value);
-		const y = parseFloat((document.getElementById('coordY') as HTMLInputElement).value);
-		const z = parseFloat((document.getElementById('coordZ') as HTMLInputElement).value);
-		const checked = document.querySelector('input[name="direction"]:checked') as HTMLInputElement | null;
-		const direction = checked ? checked.value : 'toNether';
+		const x = parseFloat(inputX.value);
+		const y = parseFloat(inputY.value);
+		const z = parseFloat(inputZ.value);
+		const checked = form.querySelector('input[name="direction"]:checked') as HTMLInputElement | null;
+		const rawDir = checked ? checked.value : 'toNether';
+		const direction: Direction = rawDir === 'toOverworld' ? 'toOverworld' : 'toNether';
 
-		if (isNaN(x) || isNaN(y) || isNaN(z)) {
-			resultDiv.innerHTML = `<div class="result-error">${t().invalidInput}</div>`;
+		if (!isValidCoord(x) || !isValidCoord(y) || !isValidCoord(z)) {
+			showError(resultDiv, t().invalidInput);
 			return;
 		}
 
-		resultDiv.innerHTML = `<div class="result-loading">${t().calculating}...</div>`;
+		// No artificial delay: render synchronously in the same frame.
+		const { x: resultX, z: resultZ } = convertCoordinates(x, y, z, direction);
 
-		setTimeout(() => {
-			const { x: resultX, z: resultZ } = convertCoordinates(x, y, z, direction as Direction);
+		const tr = t();
+		const overworldX = direction === 'toNether' ? x : resultX;
+		const overworldZ = direction === 'toNether' ? z : resultZ;
+		const netherX = direction === 'toNether' ? resultX : x;
+		const netherZ = direction === 'toNether' ? resultZ : z;
 
-			const tr = t();
-			const overworldX = direction === 'toNether' ? x : resultX;
-			const overworldZ = direction === 'toNether' ? z : resultZ;
-			const netherX = direction === 'toNether' ? resultX : x;
-			const netherZ = direction === 'toNether' ? resultZ : z;
+		const doc = document;
+		resultDiv.textContent = "";
+		const card = doc.createElement("div");
+		card.className = "result-success";
+		const h3 = doc.createElement("h3");
+		h3.textContent = tr.resultTitle;
+		const grid = doc.createElement("div");
+		grid.className = "result-grid";
+		grid.append(
+			resultColumn(doc, tr.overworldLabel, overworldX, y, overworldZ, tr),
+			resultColumn(doc, tr.netherLabel, netherX, y, netherZ, tr),
+		);
+		const copyBtn = doc.createElement("button");
+		copyBtn.className = "copy-btn";
+		copyBtn.id = "copyBtn";
+		copyBtn.type = "button";
+		copyBtn.textContent = tr.copyBtn;
+		card.append(h3, grid, copyBtn);
+		resultDiv.appendChild(card);
 
-			resultDiv.innerHTML = `
-<div class="result-success">
-<h3>${tr.resultTitle}</h3>
-<div class="result-grid">
-<div class="result-column">
-<strong>${tr.overworldLabel}</strong>
-<div class="result-coords">
-<span class="result-coord"><span class="result-coord-label">${tr.xLabel}:</span><span class="result-coord-value">${formatCoord(overworldX)}</span></span>
-<span class="result-coord"><span class="result-coord-label">${tr.yLabel}:</span><span class="result-coord-value">${formatCoord(y)}</span></span>
-<span class="result-coord"><span class="result-coord-label">${tr.zLabel}:</span><span class="result-coord-value">${formatCoord(overworldZ)}</span></span>
-</div>
-</div>
-<div class="result-column">
-<strong>${tr.netherLabel}</strong>
-<div class="result-coords">
-<span class="result-coord"><span class="result-coord-label">${tr.xLabel}:</span><span class="result-coord-value">${formatCoord(netherX)}</span></span>
-<span class="result-coord"><span class="result-coord-label">${tr.yLabel}:</span><span class="result-coord-value">${formatCoord(y)}</span></span>
-<span class="result-coord"><span class="result-coord-label">${tr.zLabel}:</span><span class="result-coord-value">${formatCoord(netherZ)}</span></span>
-</div>
-</div>
-</div>
-<button class="copy-btn" id="copyBtn">${tr.copyBtn}</button>
-</div>
-`;
-
-			const copyBtn = document.getElementById('copyBtn');
-			if (copyBtn) {
-				copyBtn.addEventListener('click', () => {
-					const textToCopy = `${tr.overworldLabel}: X=${formatCoord(overworldX)}, Y=${formatCoord(y)}, Z=${formatCoord(overworldZ)}
-${tr.netherLabel}: X=${formatCoord(netherX)}, Y=${formatCoord(y)}, Z=${formatCoord(netherZ)}`;
-
-					navigator.clipboard.writeText(textToCopy).then(() => {
-						copyBtn.textContent = tr.copySuccess;
-						setTimeout(() => {
-							copyBtn.textContent = tr.copyBtn;
-						}, 2000);
-					}).catch(() => {
-						copyBtn.textContent = tr.copyError;
-						setTimeout(() => {
-							copyBtn.textContent = tr.copyBtn;
-						}, 2000);
-					});
-				});
-			}
-		}, 300);
+		// Single handler per render (assignment, not addEventListener pile-up).
+		let revertTimer: number | undefined;
+		copyBtn.onclick = () => {
+			const textToCopy = `${tr.overworldLabel}: X=${formatCoord(overworldX)}, Y=${formatCoord(y)}, Z=${formatCoord(overworldZ)}\n${tr.netherLabel}: X=${formatCoord(netherX)}, Y=${formatCoord(y)}, Z=${formatCoord(netherZ)}`;
+			navigator.clipboard.writeText(textToCopy).then(() => {
+				copyBtn.textContent = tr.copySuccess;
+				window.clearTimeout(revertTimer);
+				revertTimer = window.setTimeout(() => {
+					copyBtn.textContent = tr.copyBtn;
+				}, 2000);
+			}).catch(() => {
+				copyBtn.textContent = tr.copyError;
+				window.clearTimeout(revertTimer);
+				revertTimer = window.setTimeout(() => {
+					copyBtn.textContent = tr.copyBtn;
+				}, 2000);
+			});
+		};
 	});
 }

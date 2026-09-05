@@ -8,10 +8,12 @@
 
 import { initUi } from '../../shared/ui';
 import { decodeUtf8Sig, encodeUtf8 } from '../../shared/encoding';
+import { escapeHtml } from '../../shared/html';
+import { sanitizeZipPath } from '../../shared/path';
 import { translations } from './translations';
 import { buildTemplate, type TemplateKind } from './templates';
 import { QUICK_TEMPLATES, buildQuickTemplate, type QuickTemplate, docsUrlForPath } from './quick-templates';
-import { loadMonaco, languageForPath, isBinary } from './monaco';
+import { loadMonaco, languageForPath, isBinary, type MonacoInstance, type MonacoEditor } from './monaco';
 import {
 	type FileMap,
 	unzipPack,
@@ -23,7 +25,7 @@ import {
 	manifestName,
 	downloadName,
 } from './pack';
-import { saveProject, loadProject, clearProject, type ProjectSnapshot } from './storage';
+import { saveProject, loadProject, clearProject, scheduleSaveProject, type ProjectSnapshot } from './storage';
 
 // ---- State ----
 
@@ -37,28 +39,82 @@ let projectName = '';
 let pendingName = '';
 let dirty = false;
 let currentText = '';
-let editor: any = null;
+let editor: MonacoEditor | HTMLTextAreaElement | null = null;
 let editorKind: 'monaco' | 'textarea' | null = null;
-let monacoRef: any = null;
+let monacoRef: MonacoInstance | null = null;
 let editorToken = 0;
-let treeRegistry: Array<{ action: string; path: string }> = [];
-let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let themeObserver: MutationObserver | null = null;
 
 const MAX_BYTES = 100 * 1024 * 1024;
+
+// ---- Cached DOM refs (queried once per shell render, reused by renders) ----
+
+let appEl: HTMLElement | null = null;
+let treeEl: HTMLElement | null = null;
+let breadcrumbEl: HTMLElement | null = null;
+let editorMountEl: HTMLElement | null = null;
+let fileHeadEl: HTMLElement | null = null;
+let delegationWired = false;
+
+function getApp(): HTMLElement | null {
+	if (appEl && appEl.isConnected) return appEl;
+	appEl = document.getElementById('app');
+	return appEl;
+}
+
+function getTree(): HTMLElement | null {
+	if (treeEl && treeEl.isConnected) return treeEl;
+	treeEl = document.getElementById('aeTree');
+	return treeEl;
+}
+
+function getBreadcrumb(): HTMLElement | null {
+	if (breadcrumbEl && breadcrumbEl.isConnected) return breadcrumbEl;
+	breadcrumbEl = document.getElementById('aeBreadcrumb');
+	return breadcrumbEl;
+}
+
+function getEditorMount(): HTMLElement | null {
+	if (editorMountEl && editorMountEl.isConnected) return editorMountEl;
+	editorMountEl = document.getElementById('aeEditorMount');
+	return editorMountEl;
+}
+
+function getFileHead(): HTMLElement | null {
+	if (fileHeadEl && fileHeadEl.isConnected) return fileHeadEl;
+	fileHeadEl = document.getElementById('aeFileHead');
+	return fileHeadEl;
+}
+
+function refreshDomCache(): void {
+	appEl = document.getElementById('app');
+	treeEl = document.getElementById('aeTree');
+	breadcrumbEl = document.getElementById('aeBreadcrumb');
+	editorMountEl = document.getElementById('aeEditorMount');
+	fileHeadEl = document.getElementById('aeFileHead');
+}
+
+// ---- Memoized listDir (invalidated on any files/explicitFolders mutation) ----
+
+type DirEntries = { folders: string[]; files: string[] };
+const listDirCache = new Map<string, DirEntries>();
+
+function invalidateDirCache(): void {
+	listDirCache.clear();
+}
+
+function cachedListDir(dir: string): DirEntries {
+	const hit = listDirCache.get(dir);
+	if (hit) return hit;
+	const entries = listDir(files, explicitFolders, dir);
+	listDirCache.set(dir, entries);
+	return entries;
+}
 
 // ---- Small helpers ----
 
 function t() {
 	return translations[currentLang];
-}
-
-function escapeHtml(s: string): string {
-	return s
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
 }
 
 function formatSize(n: number): string {
@@ -67,9 +123,112 @@ function formatSize(n: number): string {
 	return (n / (1024 * 1024)).toFixed(2) + ' MB';
 }
 
-function register(action: string, path: string): number {
-	treeRegistry.push({ action, path });
-	return treeRegistry.length - 1;
+function isMonacoEditor(v: unknown): v is MonacoEditor {
+	if (!v || typeof v !== 'object') return false;
+	const r = v as Record<string, unknown>;
+	return (
+		typeof r['getValue'] === 'function' &&
+		typeof r['dispose'] === 'function' &&
+		typeof r['onDidChangeModelContent'] === 'function'
+	);
+}
+
+function isMonacoInstanceLocal(v: unknown): v is MonacoInstance {
+	if (!v || typeof v !== 'object') return false;
+	const m = v as Record<string, unknown>;
+	const ed = m['editor'] as Record<string, unknown> | null | undefined;
+	if (!ed || typeof ed['create'] !== 'function') return false;
+	const langs = m['languages'] as Record<string, unknown> | null | undefined;
+	return !!langs;
+}
+
+// ---- Path sanitization (Zip-Slip safe, observable-compatible for valid names) ----
+
+function hasNul(s: string): boolean {
+	return s.indexOf('\0') !== -1;
+}
+
+function hasDotDotSegment(s: string): boolean {
+	const parts = s.split('/');
+	for (const p of parts) if (p === '..') return true;
+	return false;
+}
+
+/** Resolve a user-typed file name (may include subdirs) under `dir`. Null = reject. */
+function resolveNewFilePath(dir: string, raw: string): string | null {
+	if (hasNul(raw)) return null;
+	const norm = raw.trim().replace(/\\/g, '/');
+	if (!norm || norm.startsWith('/') || norm.endsWith('/')) return null;
+	if (hasDotDotSegment(norm)) return null;
+	if (/^[A-Za-z]:/.test(norm)) return null;
+	// Collapse duplicate slashes for the join; sanitizeZipPath does the rest.
+	const collapsed = norm.replace(/\/{2,}/g, '/').replace(/(^|\/)\.\//g, '$1');
+	if (!collapsed) return null;
+	const joined = joinPath(dir, collapsed);
+	const safe = sanitizeZipPath(joined);
+	if (safe === null || safe.endsWith('/')) return null;
+	if (dir && !(safe === dir.slice(0, -1) || safe.startsWith(dir))) return null;
+	return safe;
+}
+
+/** Resolve a user-typed folder name under `dir`. Returns dir path ending with "/". */
+function resolveNewFolderPath(dir: string, raw: string): string | null {
+	if (hasNul(raw)) return null;
+	const trimmed = raw.trim().replace(/\\/g, '/').replace(/\/+$/g, '');
+	if (!trimmed || trimmed.startsWith('/')) return null;
+	if (hasDotDotSegment(trimmed)) return null;
+	if (/^[A-Za-z]:/.test(trimmed)) return null;
+	const collapsed = trimmed.replace(/\/{2,}/g, '/');
+	if (!collapsed || collapsed === '.' || collapsed === '..') return null;
+	const joined = joinPath(dir, collapsed);
+	const safe = sanitizeZipPath(joined);
+	if (safe === null) return null;
+	const folderPath = safe + '/';
+	if (dir && !folderPath.startsWith(dir)) return null;
+	return folderPath;
+}
+
+/** Resolve a single-segment rename for a file. Null = reject. */
+function resolveRenameFile(oldPath: string, raw: string): string | null {
+	if (hasNul(raw)) return null;
+	const next = raw.trim().replace(/\\/g, '/');
+	if (!next || next === '.' || next === '..') return null;
+	if (next.indexOf('/') !== -1) return null;
+	if (/^[A-Za-z]:/.test(next)) return null;
+	const parent = dirOf(oldPath);
+	const safe = sanitizeZipPath(joinPath(parent, next));
+	if (safe === null || safe.endsWith('/')) return null;
+	if (dirOf(safe) !== parent) return null;
+	return safe;
+}
+
+/** Resolve a single-segment rename for a folder (path ends with "/"). */
+function resolveRenameFolder(oldPath: string, raw: string): string | null {
+	if (hasNul(raw)) return null;
+	const next = raw.trim().replace(/\\/g, '/').replace(/\/+$/g, '');
+	if (!next || next === '.' || next === '..') return null;
+	if (next.indexOf('/') !== -1) return null;
+	if (/^[A-Za-z]:/.test(next)) return null;
+	const parent = dirOf(oldPath.slice(0, -1));
+	const safe = sanitizeZipPath(joinPath(parent, next));
+	if (safe === null) return null;
+	return safe + '/';
+}
+
+/** Sanitize an uploaded file name (browsers give a basename, but never trust it). */
+function resolveUploadPath(dir: string, fileName: string): string | null {
+	if (hasNul(fileName)) return null;
+	const norm = fileName.trim().replace(/\\/g, '/');
+	if (!norm) return null;
+	const segs = norm.split('/').filter((s) => s !== '' && s !== '.');
+	if (segs.length === 0) return null;
+	const base = segs[segs.length - 1];
+	if (!base || base === '..' || hasDotDotSegment(base)) return null;
+	if (/^[A-Za-z]:/.test(base)) return null;
+	const safe = sanitizeZipPath(joinPath(dir, base));
+	if (safe === null || safe.endsWith('/')) return null;
+	if (dir && !(safe === dir.slice(0, -1) || safe.startsWith(dir))) return null;
+	return safe;
 }
 
 // ---- Inline dialogs (replaces prompt/confirm/alert, which are blocked in
@@ -162,24 +321,26 @@ function persistNow() {
 	void saveProject(snapshot());
 }
 
-/** Debounced save (used while typing or navigating). */
+/** Debounced save with backpressure (used while typing or navigating). */
 function schedulePersist() {
 	if (!loaded) return;
-	if (saveTimer !== undefined) clearTimeout(saveTimer);
-	saveTimer = setTimeout(() => {
-		saveTimer = undefined;
-		persistNow();
-	}, 400);
+	try {
+		scheduleSaveProject(snapshot());
+	} catch {
+		// Best-effort: never break typing on a persistence failure.
+	}
 }
 
 // ---- Rendering ----
 
 function renderApp() {
-	const app = document.getElementById('app');
+	const app = getApp();
 	if (!app) return;
 	app.innerHTML = loaded ? editorShellHtml() : landingHtml();
+	refreshDomCache();
 	if (loaded) {
 		wireEditorShell();
+		ensureDelegation();
 		renderTree();
 		renderFileHead();
 		void remountEditor();
@@ -266,29 +427,28 @@ function editorShellHtml(): string {
 }
 
 function renderTree() {
-	const tree = document.getElementById('aeTree');
-	const bc = document.getElementById('aeBreadcrumb');
+	const tree = getTree();
+	const bc = getBreadcrumb();
 	if (!tree || !bc) return;
-	treeRegistry = [];
 
 	bc.innerHTML = buildBreadcrumb();
 
-	const { folders, files: fileNames } = listDir(files, explicitFolders, currentDir);
+	const { folders, files: fileNames } = cachedListDir(currentDir);
 	const rows: string[] = [];
 
 	if (currentDir !== '') {
 		rows.push(
-			`<div class="ae-row ae-row-up"><button type="button" class="ae-entry" data-ae-act="${register('navUp', '')}">⬅️ ${escapeHtml(t().upFolder)}</button></div>`
+			`<div class="ae-row ae-row-up"><button type="button" class="ae-entry" data-action="navUp" data-path="">⬅️ ${escapeHtml(t().upFolder)}</button></div>`
 		);
 	}
 
 	for (const name of folders) {
 		const path = joinPath(currentDir, name) + '/';
 		rows.push(
-			`<div class="ae-row ae-row-folder"><button type="button" class="ae-entry" data-ae-act="${register('openFolder', path)}">📁 ${escapeHtml(name)}</button>
+			`<div class="ae-row ae-row-folder"><button type="button" class="ae-entry" data-action="openFolder" data-path="${escapeHtml(path)}">📁 ${escapeHtml(name)}</button>
 				<div class="ae-row-actions">
-					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-ae-act="${register('renameFolder', path)}">✏️</button>
-					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-ae-act="${register('deleteFolder', path)}">🗑️</button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-action="renameFolder" data-path="${escapeHtml(path)}">✏️</button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-action="deleteFolder" data-path="${escapeHtml(path)}">🗑️</button>
 				</div>
 			</div>`
 		);
@@ -299,10 +459,10 @@ function renderTree() {
 		const active = path === openPath ? ' ae-active' : '';
 		const icon = isBinary(path, files[path]) ? '🖼️' : '📄';
 		rows.push(
-			`<div class="ae-row ae-row-file${active}"><button type="button" class="ae-entry" data-ae-act="${register('openFile', path)}">${icon} ${escapeHtml(name)}</button>
+			`<div class="ae-row ae-row-file${active}"><button type="button" class="ae-entry" data-action="openFile" data-path="${escapeHtml(path)}">${icon} ${escapeHtml(name)}</button>
 				<div class="ae-row-actions">
-					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-ae-act="${register('renameFile', path)}">✏️</button>
-					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-ae-act="${register('deleteFile', path)}">🗑️</button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-action="renameFile" data-path="${escapeHtml(path)}">✏️</button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-action="deleteFile" data-path="${escapeHtml(path)}">🗑️</button>
 				</div>
 			</div>`
 		);
@@ -310,29 +470,32 @@ function renderTree() {
 
 	if (rows.length === 0) rows.push(`<div class="ae-empty">${escapeHtml(t().emptyDir)}</div>`);
 	tree.innerHTML = rows.join('');
-
-	wireTree(bc);
+	// Clicks are handled by the single delegated listener on #app (see ensureDelegation).
 }
 
 function buildBreadcrumb(): string {
 	const parts = currentDir ? currentDir.slice(0, -1).split('/') : [];
 	let acc = '';
-	let html = `<button type="button" class="ae-crumb" data-ae-nav="${register('navTo', '')}" title="${escapeHtml(t().rootLabel)}">🏠</button>`;
+	let html = `<button type="button" class="ae-crumb" data-action="navTo" data-path="" title="${escapeHtml(t().rootLabel)}">🏠</button>`;
 	for (const p of parts) {
 		acc = acc ? acc + '/' + p : p;
-		html += `<span class="ae-crumb-sep">/</span><button type="button" class="ae-crumb" data-ae-nav="${register('navTo', acc + '/')}">${escapeHtml(p)}</button>`;
+		html += `<span class="ae-crumb-sep">/</span><button type="button" class="ae-crumb" data-action="navTo" data-path="${escapeHtml(acc + '/')}">${escapeHtml(p)}</button>`;
 	}
 	return html;
 }
 
 function renderFileHead() {
-	const el = document.getElementById('aeFileHead');
+	const el = getFileHead();
 	if (!el) return;
 	if (!openPath) {
 		el.innerHTML = `<div class="ae-filehead-empty">${escapeHtml(t().noFileOpen)}</div>`;
 		return;
 	}
 	const data = files[openPath];
+	if (!data) {
+		el.innerHTML = `<div class="ae-filehead-empty">${escapeHtml(t().noFileOpen)}</div>`;
+		return;
+	}
 	const bin = isBinary(openPath, data);
 	const docsUrl = docsUrlForPath(openPath);
 	el.innerHTML = `
@@ -355,7 +518,7 @@ function renderFileHead() {
 function updateStatus() {
 	const el = document.getElementById('aeStatus');
 	if (!el) return;
-	if (!openPath || isBinary(openPath, files[openPath])) {
+	if (!openPath || !files[openPath] || isBinary(openPath, files[openPath])) {
 		el.textContent = openPath ? t().binary : '';
 		el.className = 'ae-status';
 		return;
@@ -364,7 +527,28 @@ function updateStatus() {
 	el.className = 'ae-status ' + (dirty ? 'ae-dirty' : 'ae-saved');
 }
 
-// ---- Event wiring ----
+// ---- Event wiring (delegation: 1 listener for tree + breadcrumb) ----
+
+function onAppClick(e: Event) {
+	const target = e.target as HTMLElement | null;
+	if (!target || typeof target.closest !== 'function') return;
+	const btn = target.closest('[data-action]') as HTMLElement | null;
+	if (!btn) return;
+	// Only handle actions inside the tree / breadcrumb containers.
+	if (!btn.closest('#aeTree,#aeBreadcrumb')) return;
+	const action = btn.getAttribute('data-action');
+	if (!action) return;
+	const path = btn.getAttribute('data-path') ?? '';
+	handleTreeAction(action, path);
+}
+
+function ensureDelegation(): void {
+	if (delegationWired) return;
+	const app = getApp();
+	if (!app) return;
+	app.addEventListener('click', onAppClick as EventListener);
+	delegationWired = true;
+}
 
 function wireLanding() {
 	const nameInput = document.getElementById('aeName') as HTMLInputElement | null;
@@ -415,27 +599,6 @@ function wireEditorShell() {
 	});
 }
 
-function wireTree(bc: HTMLElement) {
-	bc.querySelectorAll<HTMLElement>('[data-ae-nav]').forEach((el) => {
-		el.addEventListener('click', () => {
-			const rec = treeRegistry[Number(el.getAttribute('data-ae-nav'))];
-			if (!rec) return;
-			currentDir = rec.path;
-			renderTree();
-			schedulePersist();
-		});
-	});
-
-	const tree = document.getElementById('aeTree');
-	if (!tree) return;
-	tree.querySelectorAll<HTMLElement>('[data-ae-act]').forEach((el) => {
-		el.addEventListener('click', () => {
-			const rec = treeRegistry[Number(el.getAttribute('data-ae-act'))];
-			if (rec) handleTreeAction(rec.action, rec.path);
-		});
-	});
-}
-
 function wireFileHead() {
 	document.getElementById('aeSave')?.addEventListener('click', saveFile);
 	document.getElementById('aeRename')?.addEventListener('click', () => {
@@ -454,6 +617,11 @@ function wireFileHead() {
 
 function handleTreeAction(action: string, path: string) {
 	switch (action) {
+		case 'navTo':
+			currentDir = path;
+			renderTree();
+			schedulePersist();
+			break;
 		case 'openFolder':
 			currentDir = path;
 			renderTree();
@@ -485,27 +653,41 @@ function handleTreeAction(action: string, path: string) {
 // ---- Editor management ----
 
 function destroyEditor() {
-	if (editor && editorKind === 'monaco' && typeof editor.dispose === 'function') {
-		editor.dispose();
+	if (editor) {
+		try {
+			if (editorKind === 'monaco' && isMonacoEditor(editor)) {
+				editor.dispose();
+			}
+		} catch {
+			// Best-effort: never break navigation on a dispose failure.
+		}
 	}
 	editor = null;
 	editorKind = null;
+	monacoRef = null;
 }
 
 function getEditorValue(): string {
-	if (editorKind === 'monaco' && editor) return editor.getValue();
-	if (editorKind === 'textarea' && editor) return (editor as HTMLTextAreaElement).value;
+	if (editorKind === 'monaco' && editor && isMonacoEditor(editor)) {
+		try {
+			return editor.getValue();
+		} catch {
+			return currentText;
+		}
+	}
+	if (editorKind === 'textarea' && editor && editor instanceof HTMLTextAreaElement) return editor.value;
 	return currentText;
 }
 
 async function createEditor(mount: HTMLElement, path: string, text: string, token: number) {
 	try {
-		const monaco = await loadMonaco();
+		const loadedMonaco: unknown = await loadMonaco();
 		if (token !== editorToken) return;
-		monacoRef = monaco;
+		if (!isMonacoInstanceLocal(loadedMonaco)) throw new Error('Monaco failed to load');
+		monacoRef = loadedMonaco;
 		const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'vs-dark' : 'vs';
 		editorKind = 'monaco';
-		editor = monaco.editor.create(mount, {
+		editor = monacoRef.editor.create(mount, {
 			value: text,
 			language: languageForPath(path),
 			theme,
@@ -516,18 +698,28 @@ async function createEditor(mount: HTMLElement, path: string, text: string, toke
 			tabSize: 2,
 			wordWrap: 'on',
 		});
-		editor.onDidChangeModelContent(() => {
-			currentText = editor.getValue();
-			dirty = true;
-			updateStatus();
-			schedulePersist();
-		});
-		editor.focus();
+		const monacoEditor = editor;
+		if (isMonacoEditor(monacoEditor)) {
+			monacoEditor.onDidChangeModelContent(() => {
+				// Per-keystroke work stays minimal: update the in-memory text
+				// plus the tiny status label. No innerHTML re-renders here.
+				try {
+					currentText = monacoEditor.getValue();
+				} catch {
+					// Keep the last known text on read failure.
+				}
+				dirty = true;
+				updateStatus();
+				schedulePersist();
+			});
+		}
+		if (isMonacoEditor(editor)) editor.focus();
 	} catch (err) {
 		if (token !== editorToken) return;
 		console.error('Monaco failed to load, using textarea fallback:', err);
 		mount.innerHTML = `<textarea id="aeFallback" spellcheck="false" autocapitalize="off"></textarea>`;
-		const ta = mount.querySelector('#aeFallback') as HTMLTextAreaElement;
+		const ta = mount.querySelector('#aeFallback') as HTMLTextAreaElement | null;
+		if (!ta) return;
 		ta.value = text;
 		ta.addEventListener('input', () => {
 			currentText = ta.value;
@@ -542,7 +734,7 @@ async function createEditor(mount: HTMLElement, path: string, text: string, toke
 
 async function remountEditor() {
 	const token = ++editorToken;
-	const mount = document.getElementById('aeEditorMount');
+	const mount = getEditorMount();
 	if (!mount) return;
 
 	if (!openPath) {
@@ -556,6 +748,7 @@ async function remountEditor() {
 		openPath = null;
 		dirty = false;
 		currentText = '';
+		destroyEditor();
 		mount.innerHTML = `<div class="ae-editor-empty">${escapeHtml(t().selectFileHint)}</div>`;
 		return;
 	}
@@ -583,8 +776,10 @@ function showQuickAdd() {
 	];
 
 	let selected: QuickTemplate | null = null;
+	let currentFilter = '';
 
 	function renderTemplateList(filter: string) {
+		currentFilter = filter;
 		const list = document.getElementById('aeQuickList');
 		if (!list) return;
 		const q = filter.toLowerCase();
@@ -608,7 +803,7 @@ function showQuickAdd() {
 			for (const t of items) {
 				const active = selected === t ? ' ae-quick-selected' : '';
 				html += `
-					<button type="button" class="ae-quick-item${active}" data-ae-tmpl="${QUICK_TEMPLATES.indexOf(t)}">
+					<button type="button" class="ae-quick-item${active}" data-qtmpl="${QUICK_TEMPLATES.indexOf(t)}">
 						<span class="ae-quick-label">${escapeHtml(t.label)}</span>
 						<span class="ae-quick-desc">${escapeHtml(t.description)}</span>
 						<span class="ae-quick-path">${escapeHtml(t.filename)}</span>
@@ -616,14 +811,15 @@ function showQuickAdd() {
 			}
 		}
 		list.innerHTML = html;
-
-		list.querySelectorAll<HTMLElement>('[data-ae-tmpl]').forEach((btn) => {
-			btn.addEventListener('click', () => {
-				const idx = Number(btn.getAttribute('data-ae-tmpl'));
-				selected = QUICK_TEMPLATES[idx];
-				renderTemplateList(filter);
-			});
-		});
+		// Single delegated listener (assigned, not stacked) for the whole list.
+		list.onclick = (e: MouseEvent) => {
+			const btn = (e.target as HTMLElement).closest?.('[data-qtmpl]') as HTMLElement | null;
+			if (!btn || !list.contains(btn)) return;
+			const idx = Number(btn.getAttribute('data-qtmpl'));
+			if (!Number.isInteger(idx) || idx < 0 || idx >= QUICK_TEMPLATES.length) return;
+			selected = QUICK_TEMPLATES[idx];
+			renderTemplateList(currentFilter);
+		};
 	}
 
 	const overlay = document.createElement('div');
@@ -659,7 +855,14 @@ function showQuickAdd() {
 		const name = nameInput.value.trim() || 'custom';
 		const result = buildQuickTemplate(selected, name);
 		for (const [relPath, data] of Object.entries(result)) {
-			const path = joinPath(currentDir, relPath);
+			// Templates are trusted, but still validate the final joined path.
+			const joined = joinPath(currentDir, relPath);
+			const safe = sanitizeZipPath(joined);
+			if (safe === null || safe.endsWith('/')) {
+				showToast(t().exists);
+				return;
+			}
+			const path = safe;
 			if (files[path] !== undefined) {
 				showToast(t().exists.replace('{name}', relPath));
 				return;
@@ -675,11 +878,13 @@ function showQuickAdd() {
 			}
 			files[path] = data;
 		}
+		invalidateDirCache();
 		persistNow();
 		renderTree();
 		// Open the first generated file
-		const firstPath = joinPath(currentDir, Object.keys(result)[0]);
-		if (files[firstPath] !== undefined) openFile(firstPath);
+		const firstRel = Object.keys(result)[0];
+		const firstPath = sanitizeZipPath(joinPath(currentDir, firstRel));
+		if (firstPath !== null && files[firstPath] !== undefined) openFile(firstPath);
 	};
 
 	confirmBtn.addEventListener('click', () => close(true));
@@ -720,24 +925,30 @@ async function openFile(path: string) {
 
 function saveFile() {
 	if (!openPath) return;
-	if (isBinary(openPath, files[openPath])) return;
+	if (!files[openPath] || isBinary(openPath, files[openPath])) return;
 	files[openPath] = encodeUtf8(getEditorValue());
 	dirty = false;
 	updateStatus();
+	invalidateDirCache();
 	persistNow();
 }
 
 async function newFile() {
 	const res = await showModal({ title: t().newFile, input: true, value: '', placeholder: t().newFileName, confirmLabel: t().create });
 	if (!res.confirmed) return;
-	const name = res.value.trim();
-	if (!name) return;
-	const path = joinPath(currentDir, name);
+	const raw = res.value.trim();
+	if (!raw) return;
+	const path = resolveNewFilePath(currentDir, raw);
+	if (path === null) {
+		showToast(t().exists);
+		return;
+	}
 	if (files[path] !== undefined || explicitFolders.has(path + '/')) {
 		showToast(t().exists);
 		return;
 	}
 	files[path] = encodeUtf8('');
+	invalidateDirCache();
 	persistNow();
 	renderTree();
 	openFile(path);
@@ -746,14 +957,19 @@ async function newFile() {
 async function newFolder() {
 	const res = await showModal({ title: t().newFolder, input: true, value: '', placeholder: t().newFolderName, confirmLabel: t().create });
 	if (!res.confirmed) return;
-	const name = res.value.trim().replace(/\/+$/g, '');
-	if (!name) return;
-	const path = joinPath(currentDir, name) + '/';
+	const raw = res.value.trim();
+	if (!raw) return;
+	const path = resolveNewFolderPath(currentDir, raw);
+	if (path === null) {
+		showToast(t().exists);
+		return;
+	}
 	if (explicitFolders.has(path) || Object.keys(files).some((p) => p.startsWith(path))) {
 		showToast(t().exists);
 		return;
 	}
 	explicitFolders.add(path);
+	invalidateDirCache();
 	persistNow();
 	renderTree();
 }
@@ -768,13 +984,18 @@ async function uploadFiles(list: FileList | File[]) {
 		}
 		const buf = await f.arrayBuffer();
 		const data = new Uint8Array(buf);
-		const path = joinPath(currentDir, f.name);
+		const path = resolveUploadPath(currentDir, f.name);
+		if (path === null) {
+			showToast(t().exists);
+			continue;
+		}
 		if (files[path] !== undefined) {
 			const res = await showModal({ title: t().uploadFiles, message: t().overwriteConfirm.replace('{name}', f.name), confirmLabel: t().overwrite });
 			if (!res.confirmed) continue;
 		}
 		files[path] = data;
 	}
+	invalidateDirCache();
 	persistNow();
 	renderTree();
 }
@@ -783,10 +1004,13 @@ async function renameFile(path: string) {
 	const cur = baseName(path);
 	const res = await showModal({ title: t().rename, input: true, value: cur, placeholder: t().renamePrompt, confirmLabel: t().ok });
 	if (!res.confirmed) return;
-	const next = res.value.trim();
-	if (!next || next === cur) return;
-	const newPath = joinPath(dirOf(path), next);
-	if (newPath === path) return;
+	const raw = res.value.trim();
+	if (!raw || raw === cur) return;
+	const newPath = resolveRenameFile(path, raw);
+	if (newPath === null || newPath === path) {
+		if (newPath === null) showToast(t().exists);
+		return;
+	}
 	if (files[newPath] !== undefined || explicitFolders.has(newPath + '/')) {
 		showToast(t().exists);
 		return;
@@ -795,6 +1019,7 @@ async function renameFile(path: string) {
 	delete files[path];
 	files[newPath] = data;
 	if (openPath === path) openPath = newPath;
+	invalidateDirCache();
 	persistNow();
 	renderTree();
 	renderFileHead();
@@ -809,6 +1034,7 @@ async function deleteFile(path: string) {
 		dirty = false;
 		currentText = '';
 	}
+	invalidateDirCache();
 	persistNow();
 	renderTree();
 	renderFileHead();
@@ -819,12 +1045,14 @@ async function renameFolder(path: string) {
 	const cur = baseName(path);
 	const res = await showModal({ title: t().rename, input: true, value: cur, placeholder: t().renamePrompt, confirmLabel: t().ok });
 	if (!res.confirmed) return;
-	const next = res.value.trim().replace(/\/+$/g, '');
-	if (!next || next === cur) return;
+	const raw = res.value.trim();
+	if (!raw || raw === cur) return;
 
-	const parent = dirOf(path.slice(0, -1));
-	const newPath = parent + next + '/';
-	if (newPath === path) return;
+	const newPath = resolveRenameFolder(path, raw);
+	if (newPath === null || newPath === path) {
+		if (newPath === null) showToast(t().exists);
+		return;
+	}
 
 	if (
 		Object.keys(files).some((p) => p.startsWith(newPath)) ||
@@ -856,6 +1084,7 @@ async function renameFolder(path: string) {
 	if (currentDir === path || currentDir.startsWith(prefix)) {
 		currentDir = newPath + (currentDir === path ? '' : currentDir.slice(prefix.length));
 	}
+	invalidateDirCache();
 	persistNow();
 	renderTree();
 	renderFileHead();
@@ -881,6 +1110,7 @@ async function deleteFolder(path: string) {
 	if (currentDir === path || currentDir.startsWith(path)) {
 		currentDir = dirOf(path.slice(0, -1));
 	}
+	invalidateDirCache();
 	persistNow();
 	renderTree();
 	renderFileHead();
@@ -893,7 +1123,7 @@ function download() {
 	const zip = zipPack(files);
 	const copy = new Uint8Array(zip.byteLength);
 	copy.set(zip);
-	const blob = new Blob([copy], { type: 'application/zip' });
+	const blob = new Blob([copy as BlobPart], { type: 'application/zip' });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
 	a.href = url;
@@ -914,6 +1144,7 @@ function resetProjectState() {
 	projectName = '';
 	currentText = '';
 	dirty = false;
+	invalidateDirCache();
 	destroyEditor();
 	editorToken++;
 }
@@ -922,6 +1153,7 @@ function createPack(kind: TemplateKind) {
 	const name = pendingName.trim() || 'My Pack';
 	resetProjectState();
 	files = buildTemplate(kind, name);
+	invalidateDirCache();
 	loaded = true;
 	projectName = manifestName(files) || name;
 	renderApp();
@@ -942,6 +1174,7 @@ async function openUploadedPack(file: File) {
 		}
 		resetProjectState();
 		files = parsed;
+		invalidateDirCache();
 		loaded = true;
 		projectName = manifestName(files) || file.name.replace(/\.[^.]+$/, '');
 		renderApp();
@@ -963,6 +1196,29 @@ async function startOver() {
 	renderApp();
 }
 
+// ---- Theme observer (single instance, disconnect-before-reobserve) ----
+
+function ensureThemeObserver(): void {
+	if (themeObserver) themeObserver.disconnect();
+	themeObserver = new MutationObserver(() => {
+		if (editorKind === 'monaco' && monacoRef) {
+			try {
+				monacoRef.editor.setTheme(
+					document.documentElement.getAttribute('data-theme') === 'dark' ? 'vs-dark' : 'vs'
+				);
+			} catch {
+				// Best-effort.
+			}
+		}
+	});
+	themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+}
+
+function disposeThemeObserver(): void {
+	themeObserver?.disconnect();
+	themeObserver = null;
+}
+
 // ---- Bootstrap ----
 
 const uiHooks = {
@@ -980,6 +1236,11 @@ export function init() {
 	}
 }
 
+export function dispose() {
+	disposeThemeObserver();
+	destroyEditor();
+}
+
 async function initTool() {
 	currentLang = initUi(translations, uiHooks);
 
@@ -994,6 +1255,7 @@ async function initTool() {
 		dirty = saved.dirty;
 		currentText = saved.currentText;
 		loaded = true;
+		invalidateDirCache();
 	}
 
 	renderApp();
@@ -1018,11 +1280,5 @@ async function initTool() {
 		if (document.visibilityState === 'hidden') persistNow();
 	});
 
-	new MutationObserver(() => {
-		if (editorKind === 'monaco' && monacoRef) {
-			monacoRef.editor.setTheme(
-				document.documentElement.getAttribute('data-theme') === 'dark' ? 'vs-dark' : 'vs'
-			);
-		}
-	}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+	ensureThemeObserver();
 }

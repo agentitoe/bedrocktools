@@ -13,20 +13,46 @@ import {
 	setIdentifierManuallyEdited,
 } from './state';
 import { getItemById, getItemName, getItemIdentifier, createImgTag } from './items';
-import { uuid, sanitizeName, escapeHtml } from './util';
+import { uuid, sanitizeName, escapeHtml, debounce } from './util';
 
-// ---- Item picker ----
+// ---- Item picker (scoped per-instance overlay, debounced + chunked grid) ----
 
-let pickerOnSelect: ((id: number | null) => void) | null = null;
+interface PickerInstance {
+	overlay: HTMLElement;
+	grid: HTMLElement;
+	search: HTMLInputElement;
+	onSelect: (id: number | null) => void;
+	escHandler: (e: KeyboardEvent) => void;
+	filtered: AnyItem[];
+	rendered: number;
+	chunkScheduled: boolean;
+}
+
+let picker: PickerInstance | null = null;
 let pickerQuery = '';
 
+const PICKER_INITIAL = 200;
+const PICKER_CHUNK = 240;
+
 export function currentPickerQuery(): string {
+	if (picker) return picker.search.value;
 	const input = document.getElementById('pickerSearch') as HTMLInputElement | null;
 	return input ? input.value : pickerQuery;
 }
 
+/** Always removes the overlay *and* its Esc listener (no leaks, no races). */
+function closeCurrentPicker(): void {
+	if (!picker) return;
+	const { overlay, escHandler } = picker;
+	picker = null;
+	document.removeEventListener('keydown', escHandler);
+	overlay.remove();
+}
+
 function openPicker(onSelect: (id: number | null) => void) {
-	pickerOnSelect = onSelect;
+	// Singleton: never stack two pickers (kills the cross-instance race where
+	// a global `querySelector('.picker-overlay')` closed the wrong dialog).
+	if (picker) closeCurrentPicker();
 	pickerQuery = '';
 	const t = translations[currentLang];
 
@@ -47,35 +73,114 @@ function openPicker(onSelect: (id: number | null) => void) {
 
 	const search = overlay.querySelector('#pickerSearch') as HTMLInputElement;
 	const grid = overlay.querySelector('#pickerGrid') as HTMLElement;
+	const inst: PickerInstance = {
+		overlay,
+		grid,
+		search,
+		onSelect,
+		escHandler: (e: KeyboardEvent) => {
+			if (e.key === 'Escape') closeCurrentPicker();
+		},
+		filtered: [],
+		rendered: 0,
+		chunkScheduled: false,
+	};
+	picker = inst;
+	document.addEventListener('keydown', inst.escHandler);
 
-	overlay.querySelector('.picker-close')?.addEventListener('click', () => closePicker(overlay));
+	overlay.querySelector('.picker-close')?.addEventListener('click', closeCurrentPicker);
 	overlay.querySelector('.picker-clear')?.addEventListener('click', () => {
-		if (pickerOnSelect) pickerOnSelect(null);
-		closePicker(overlay);
+		inst.onSelect(null);
+		closeCurrentPicker();
 	});
-	overlay.addEventListener('click', (e) => { if (e.target === overlay) closePicker(overlay); });
-	search.addEventListener('input', () => {
+	overlay.addEventListener('click', (e) => { if (e.target === overlay) closeCurrentPicker(); });
+
+	const debouncedFilter = debounce(() => {
 		pickerQuery = search.value;
-		renderPickerGrid(search.value);
+		applyPickerFilter(search.value);
+	}, 150);
+	search.addEventListener('input', debouncedFilter);
+
+	// One delegated click for every (present + future) row — no per-card listeners.
+	grid.addEventListener('click', (e) => {
+		const btn = (e.target as HTMLElement).closest('.picker-item') as HTMLElement | null;
+		if (!btn || picker !== inst) return;
+		// Resolve through the instance's own filtered list (never a global query).
+		const item = inst.filtered[parseInt(btn.dataset.index || '-1', 10)];
+		if (!item) return;
+		inst.onSelect(item.id);
+		closeCurrentPicker();
+	});
+	let scrollTicking = false;
+	grid.addEventListener('scroll', () => {
+		if (scrollTicking || picker !== inst) return;
+		scrollTicking = true;
+		const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout;
+		schedule(() => {
+			scrollTicking = false;
+			if (picker !== inst) return;
+			if (grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 300) schedulePickerChunk(inst);
+		});
 	});
 
-	renderPickerGrid('');
+	applyPickerFilter('');
 	search.focus();
 }
 
-function closePicker(overlay: HTMLElement) {
-	overlay.remove();
-	pickerOnSelect = null;
+function schedulePickerChunk(inst: PickerInstance) {
+	if (inst.chunkScheduled) return;
+	inst.chunkScheduled = true;
+	const run = () => {
+		inst.chunkScheduled = false;
+		if (picker !== inst) return;
+		appendPickerChunk(inst, PICKER_CHUNK);
+	};
+	if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+	else setTimeout(run, 0);
 }
 
-export function renderPickerGrid(query: string) {
-	const grid = document.getElementById('pickerGrid');
+function buildPickerButton(item: AnyItem, index: number): HTMLButtonElement {
+	const btn = document.createElement('button');
+	btn.type = 'button';
+	btn.className = 'picker-item';
+	btn.dataset.index = String(index);
+	btn.appendChild(createImgTag(item, 40));
+	const meta = document.createElement('div');
+	meta.className = 'picker-meta';
+	const name = document.createElement('span');
+	name.className = 'picker-name';
+	name.textContent = getItemName(item);
+	const id = document.createElement('span');
+	id.className = 'picker-id';
+	id.textContent = getItemIdentifier(item);
+	meta.appendChild(name);
+	meta.appendChild(id);
+	btn.appendChild(meta);
+	return btn;
+}
+
+function appendPickerChunk(inst: PickerInstance, size: number) {
+	const end = Math.min(inst.filtered.length, inst.rendered + size);
+	if (end <= inst.rendered) return;
+	const frag = document.createDocumentFragment();
+	for (let i = inst.rendered; i < end; i++) {
+		frag.appendChild(buildPickerButton(inst.filtered[i], i));
+	}
+	inst.grid.appendChild(frag);
+	inst.rendered = end;
+}
+
+function applyPickerFilter(query: string) {
+	const inst = picker;
+	const grid = inst ? inst.grid : document.getElementById('pickerGrid');
 	if (!grid) return;
 	const t = translations[currentLang];
 	const q = query.toLowerCase().trim();
 
 	// Vanilla items first, then custom items extracted from imported addons.
 	const combined: AnyItem[] = [...allItems, ...customItems];
+	// Bounded pre-filter: scan all (cheap string test), but only ever
+	// materialize rows for what is shown (initial slice + scroll chunks).
 	const filtered = combined.filter((item) => {
 		if (!q) return true;
 		const identifier = getItemIdentifier(item);
@@ -85,36 +190,38 @@ export function renderPickerGrid(query: string) {
 			String(item.id).includes(q);
 	});
 
+	if (inst) {
+		inst.filtered = filtered;
+		inst.rendered = 0;
+	}
+	grid.innerHTML = '';
 	if (filtered.length === 0) {
 		grid.innerHTML = `<p class="picker-empty">${t.pickerEmpty}</p>`;
 		return;
 	}
 
-	grid.innerHTML = '';
-	for (const item of filtered) {
-		const btn = document.createElement('button');
-		btn.type = 'button';
-		btn.className = 'picker-item';
-		btn.appendChild(createImgTag(item, 40));
-		const meta = document.createElement('div');
-		meta.className = 'picker-meta';
-		const name = document.createElement('span');
-		name.className = 'picker-name';
-		name.textContent = getItemName(item);
-		const id = document.createElement('span');
-		id.className = 'picker-id';
-		id.textContent = getItemIdentifier(item);
-		meta.appendChild(name);
-		meta.appendChild(id);
-		btn.appendChild(meta);
-		btn.addEventListener('click', () => {
-			const overlay = document.querySelector('.picker-overlay');
-			if (pickerOnSelect) pickerOnSelect(item.id);
-			if (overlay) overlay.remove();
-			pickerOnSelect = null;
-		});
-		grid.appendChild(btn);
+	if (inst) {
+		// First paint is capped so a keystroke never builds 3000 buttons;
+		// the rest streams in via infinite scroll.
+		appendPickerChunk(inst, Math.min(PICKER_INITIAL, filtered.length));
+		return;
 	}
+	// No active instance (e.g. external caller): paint the capped first slice.
+	const frag = document.createDocumentFragment();
+	const end = Math.min(filtered.length, PICKER_INITIAL);
+	for (let i = 0; i < end; i++) {
+		frag.appendChild(buildPickerButton(filtered[i], i));
+	}
+	grid.appendChild(frag);
+}
+
+export function renderPickerGrid(query: string) {
+	pickerQuery = query;
+	if (picker) {
+		applyPickerFilter(query);
+		return;
+	}
+	applyPickerFilter(query);
 }
 
 // ---- Recipe list + editor ----
@@ -153,6 +260,33 @@ function nextDefaultIdentifier(): string {
 	return id;
 }
 
+/** Update only the active chip label (granular; no list rebuild, no focus loss). */
+function updateActiveChipLabel(r: RecipeState, index: number): void {
+	const list = document.getElementById('recipeList');
+	if (!list) return;
+	const chip = list.querySelector('.recipe-chip.active .chip-name');
+	if (chip) chip.textContent = recipeShortName(r, index);
+	const active = list.querySelector('.recipe-chip.active');
+	if (active) active.setAttribute('title', r.identifier);
+}
+
+function wireRecipeListOnce(list: HTMLElement) {
+	if ((list as HTMLElement & { __wired?: boolean }).__wired) return;
+	(list as HTMLElement & { __wired?: boolean }).__wired = true;
+	// Delegated: one listener for every chip (present + future).
+	list.addEventListener('click', (e) => {
+		const del = (e.target as HTMLElement).closest('.chip-delete') as HTMLElement | null;
+		if (del) {
+			e.stopPropagation();
+			const chip = del.closest('.recipe-chip') as HTMLElement | null;
+			deleteRecipe(parseInt(chip?.dataset.index || '-1', 10));
+			return;
+		}
+		const chip = (e.target as HTMLElement).closest('.recipe-chip') as HTMLElement | null;
+		if (chip) selectRecipe(parseInt(chip.dataset.index || '-1', 10));
+	});
+}
+
 export function renderRecipeList() {
 	const list = document.getElementById('recipeList');
 	if (!list) return;
@@ -163,32 +297,31 @@ export function renderRecipeList() {
 		return;
 	}
 
+	wireRecipeListOnce(list);
 	list.innerHTML = '';
+	const frag = document.createDocumentFragment();
 	recipes.forEach((r, i) => {
 		const chip = document.createElement('button');
 		chip.type = 'button';
 		chip.className = `recipe-chip${i === selectedIndex ? ' active' : ''}`;
+		chip.dataset.index = String(i);
 		chip.title = r.identifier;
 		chip.innerHTML = `
 			<span class="chip-icon">${typeIcon(r.type)}</span>
-			<span class="chip-name">${recipeShortName(r, i)}</span>
+			<span class="chip-name">${escapeHtml(recipeShortName(r, i))}</span>
 		`;
 		const del = document.createElement('span');
 		del.className = 'chip-delete';
 		del.title = t.deleteRecipe;
 		del.textContent = '✕';
-		del.addEventListener('click', (e) => {
-			e.stopPropagation();
-			deleteRecipe(i);
-		});
 		chip.appendChild(del);
-		chip.addEventListener('click', () => selectRecipe(i));
-		list.appendChild(chip);
+		frag.appendChild(chip);
 	});
+	list.appendChild(frag);
 }
 
 function selectRecipe(i: number) {
-	if (i < 0 || i >= recipes.length) return;
+	if (!Number.isInteger(i) || i < 0 || i >= recipes.length) return;
 	setSelectedIndex(i);
 	setIdentifierManuallyEdited(false);
 	renderRecipeList();
@@ -204,6 +337,7 @@ export function addRecipe() {
 }
 
 function deleteRecipe(i: number) {
+	if (!Number.isInteger(i) || i < 0 || i >= recipes.length) return;
 	recipes.splice(i, 1);
 	if (recipes.length === 0) {
 		setSelectedIndex(0);
@@ -232,6 +366,30 @@ function guiClassForFurnace(tag: FurnaceTag): string {
 		case 'blast_furnace': return 'gui-blast';
 		case 'smoker': return 'gui-smoker';
 		default: return 'gui-furnace';
+	}
+}
+
+/** Granular result-count refresh: badge + stepper value only, no GUI rebuild. */
+function refreshResultCount(r: RecipeState): void {
+	const countVal = document.getElementById('countVal');
+	if (countVal) countVal.textContent = String(r.resultCount);
+	const wrap = document.getElementById('guiWrap');
+	if (!wrap) return;
+	if (r.type !== 'shaped' && r.type !== 'shapeless') return;
+	const slots = wrap.querySelectorAll('.gui-slot');
+	if (slots.length === 0) return;
+	// The result slot is appended last for crafting panels.
+	const resultSlot = slots[slots.length - 1] as HTMLElement;
+	let badge = resultSlot.querySelector('.gui-count');
+	if (r.resultCount > 1) {
+		if (!badge) {
+			badge = document.createElement('span');
+			badge.className = 'gui-count';
+			resultSlot.appendChild(badge);
+		}
+		badge.textContent = `×${r.resultCount}`;
+	} else if (badge) {
+		badge.remove();
 	}
 }
 
@@ -273,24 +431,29 @@ export function renderEditor() {
 		<div class="controls-row" id="controlsRow"></div>
 	`;
 
-	// Type tabs
-	editor.querySelectorAll<HTMLButtonElement>('.type-tab').forEach((tab) => {
-		tab.addEventListener('click', () => {
-			const type = tab.getAttribute('data-type') as RecipeType;
-			if (type && type !== r.type) {
-				r.type = type;
-				renderRecipeList();
-				renderEditor();
-			}
-		});
+	// Type tabs (delegated on their container).
+	editor.querySelector('#typeTabs')?.addEventListener('click', (e) => {
+		const tab = (e.target as HTMLElement).closest('.type-tab') as HTMLElement | null;
+		if (!tab) return;
+		const type = tab.getAttribute('data-type') as RecipeType;
+		if (type && type !== r.type) {
+			r.type = type;
+			renderRecipeList();
+			renderEditor();
+		}
 	});
 
-	// Identifier input
+	// Identifier input: granular chip-label update per keystroke (no full
+	// re-render, focus in the input is never touched); full list sync on
+	// commit (change/blur) so ordering-dependent state stays consistent.
 	const idInput = editor.querySelector('#identifierInput') as HTMLInputElement | null;
 	if (idInput) {
 		idInput.addEventListener('input', () => {
 			setIdentifierManuallyEdited(true);
 			r.identifier = idInput.value;
+			updateActiveChipLabel(r, selectedIndex);
+		});
+		idInput.addEventListener('change', () => {
 			renderRecipeList();
 		});
 	}
@@ -325,15 +488,11 @@ export function renderEditor() {
 			const plus = controls.querySelector('#countPlus');
 			if (minus) minus.addEventListener('click', () => {
 				r.resultCount = Math.max(1, r.resultCount - 1);
-				buildGui(r);
-				const v = controls.querySelector('#countVal');
-				if (v) v.textContent = String(r.resultCount);
+				refreshResultCount(r);
 			});
 			if (plus) plus.addEventListener('click', () => {
 				r.resultCount = Math.min(64, r.resultCount + 1);
-				buildGui(r);
-				const v = controls.querySelector('#countVal');
-				if (v) v.textContent = String(r.resultCount);
+				refreshResultCount(r);
 			});
 		}
 	}

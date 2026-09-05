@@ -5,8 +5,11 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const srcToolsDir = join(root, "src", "tools");
+const srcSharedDir = join(root, "src", "shared");
 const outDir = join(root, "public", "tools");
 const publicDir = join(root, "public");
+
+const POOL_SIZE = 4;
 
 const commonBuildOptions = {
 	minify: true,
@@ -17,6 +20,11 @@ const commonBuildOptions = {
 async function buildTool(toolName, toolDir) {
 	const indexTs = join(toolDir, "index.ts");
 	const toolOutDir = join(outDir, toolName);
+	const bundleJs = join(toolOutDir, "bundle.js");
+	if (isUpToDate(bundleJs, collectToolSources(toolDir))) {
+		console.log("Skipping " + toolName + " (up to date)...");
+		return;
+	}
 	mkdirSync(toolOutDir, { recursive: true });
 
 	console.log("Building " + toolName + "...");
@@ -35,14 +43,19 @@ async function buildTool(toolName, toolDir) {
 async function buildSharedUi() {
 	const uiTs = join(root, "src", "shared", "ui.ts");
 	const assetsDir = join(publicDir, "assets");
+	const bundleJs = join(assetsDir, "ui.js");
+	if (isUpToDate(bundleJs, [uiTs])) {
+		console.log("Skipping shared UI (up to date)...");
+		return;
+	}
 	mkdirSync(assetsDir, { recursive: true });
 
+	console.log("Building shared UI...");
 	const result = await Bun.build({
 		entrypoints: [uiTs],
 		outdir: assetsDir,
-		target: "browser",
-		format: "esm",
-		minify: false,
+		naming: { entry: "ui.[ext]" },
+		...commonBuildOptions,
 	});
 	if (!result.success) {
 		for (const log of result.logs) console.error(log);
@@ -64,33 +77,94 @@ function findToolDirs() {
 
 async function gatherManifests() {
 	const toolNames = findToolDirs();
-	const manifests = [];
 
-	for (const name of toolNames) {
-		const manifestTs = join(srcToolsDir, name, "manifest.ts");
-		if (!existsSync(manifestTs)) continue;
+	const results = await Promise.all(
+		toolNames.map(async (name) => {
+			const manifestTs = join(srcToolsDir, name, "manifest.ts");
+			if (!existsSync(manifestTs)) return null;
 
-		try {
-			// Bun can import TypeScript files directly — no bundling needed for
-			// manifests since they're pure data with no dependencies.
-			const mod = await import(manifestTs);
-			const manifest = mod.manifest;
-			if (manifest) {
-				manifests.push({
-					name: manifest.name,
-					description: manifest.description,
-					icon: manifest.icon,
-					path: manifest.path,
-					color: manifest.color,
-					platforms: manifest.platforms || ["bedrock"],
-				});
+			try {
+				// Bun can import TypeScript files directly — no bundling needed for
+				// manifests since they're pure data with no dependencies.
+				const mod = await import(manifestTs);
+				const manifest = mod.manifest;
+				if (manifest) {
+					return {
+						name: manifest.name,
+						description: manifest.description,
+						icon: manifest.icon,
+						path: manifest.path,
+						color: manifest.color,
+						platforms: manifest.platforms || ["bedrock"],
+					};
+				}
+			} catch (err) {
+				console.error("Failed to gather manifest for " + name + ":", err.message);
 			}
-		} catch (err) {
-			console.error("Failed to gather manifest for " + name + ":", err.message);
+			return null;
+		}),
+	);
+
+	return results.filter(Boolean);
+}
+
+/** Run async task factories with at most `limit` concurrent workers. */
+async function runPool(factories, limit) {
+	const results = new Array(factories.length);
+	let next = 0;
+	const workers = Array.from(
+		{ length: Math.min(limit, factories.length) || 1 },
+		async () => {
+			while (next < factories.length) {
+				const idx = next++;
+				results[idx] = await factories[idx]();
+			}
+		},
+	);
+	await Promise.all(workers);
+	return results;
+}
+
+/** All `.ts` sources that can affect a tool bundle (tool + shared). */
+function collectToolSources(toolDir) {
+	const sources = [];
+	try {
+		for (const entry of readdirSync(toolDir)) {
+			if (entry.endsWith(".ts")) sources.push(join(toolDir, entry));
+		}
+	} catch {
+		/* ignore unreadable dirs; build will surface the error */
+	}
+	try {
+		for (const entry of readdirSync(srcSharedDir)) {
+			if (entry.endsWith(".ts")) sources.push(join(srcSharedDir, entry));
+		}
+	} catch {
+		/* shared dir missing: nothing extra to track */
+	}
+	return sources;
+}
+
+/**
+ * Incremental skip: true when `outFile` exists and is newer than every
+ * source file. Keeps outputs identical while skipping redundant rebuilds.
+ */
+function isUpToDate(outFile, srcFiles) {
+	if (!existsSync(outFile)) return false;
+	let outMtime;
+	try {
+		outMtime = statSync(outFile).mtimeMs;
+	} catch {
+		return false;
+	}
+	for (const src of srcFiles) {
+		try {
+			if (statSync(src).mtimeMs > outMtime) return false;
+		} catch {
+			return false;
 		}
 	}
-
-	return manifests;
+	return true;
 }
 
 async function main() {
@@ -98,10 +172,10 @@ async function main() {
 
 	const toolNames = findToolDirs();
 
-	for (const name of toolNames) {
-		const toolDir = join(srcToolsDir, name);
-		await buildTool(name, toolDir);
-	}
+	await runPool(
+		toolNames.map((name) => () => buildTool(name, join(srcToolsDir, name))),
+		POOL_SIZE,
+	);
 
 	const manifests = await gatherManifests();
 	mkdirSync(publicDir, { recursive: true });

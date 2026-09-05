@@ -8,19 +8,46 @@
 import { unzipSync, zipSync } from "fflate";
 import { decodeUtf8Sig } from "../../shared/encoding";
 import { stripJsonComments } from "../../shared/json";
-import { normalizePath } from "../../shared/path";
+import { sanitizeZipPath } from "../../shared/path";
 
 export type FileMap = Record<string, Uint8Array>;
 
 export type PackKind = "addon" | "behavior" | "resource" | "other";
 
-/** Unzip a .mcpack/.mcaddon/.zip into a flat file map (directory entries skipped). */
+/** Zip-bomb guards: reject archives that exceed these limits. */
+export const MAX_ZIP_ENTRIES = 10_000;
+export const MAX_ZIP_BYTES = 200 * 1024 * 1024;
+export const MAX_ZIP_FILE_BYTES = 50 * 1024 * 1024;
+
+export { sanitizeZipPath };
+
+/**
+ * Unzip a .mcpack/.mcaddon/.zip into a flat file map (directory entries skipped).
+ * Zero-copy: entry bytes are referenced, never sliced/copied.
+ * Rejects Zip-Slip (`../`, absolute) entries and enforces zip-bomb limits.
+ */
 export function unzipPack(data: Uint8Array): FileMap {
 	const raw = unzipSync(data);
+	const keys = Object.keys(raw);
+	if (keys.length > MAX_ZIP_ENTRIES) {
+		throw new Error(`Zip has too many entries (${keys.length} > ${MAX_ZIP_ENTRIES})`);
+	}
 	const out: FileMap = {};
-	for (const [path, content] of Object.entries(raw)) {
-		const p = normalizePath(path);
-		if (p.length === 0 || p.endsWith("/")) continue;
+	let total = 0;
+	for (const rawPath of keys) {
+		const content = raw[rawPath];
+		// Skip directory entries (fflate marks them with trailing "/").
+		if (rawPath.endsWith("/")) continue;
+		const p = sanitizeZipPath(rawPath);
+		if (p === null || p.length === 0 || p.endsWith("/")) continue;
+		if (content.length > MAX_ZIP_FILE_BYTES) {
+			throw new Error(`Zip entry too large: ${p} (${content.length} bytes)`);
+		}
+		total += content.length;
+		if (total > MAX_ZIP_BYTES) {
+			throw new Error(`Uncompressed zip too large (> ${MAX_ZIP_BYTES} bytes)`);
+		}
+		// Zero-copy: keep fflate's Uint8Array view as-is.
 		out[p] = content;
 	}
 	return out;
@@ -94,13 +121,17 @@ export function listDir(
 function manifestTypes(text: string): string[] {
 	const types: string[] = [];
 	try {
-		const m = JSON.parse(stripJsonComments(text));
-		const modules = Array.isArray(m?.modules) ? m.modules : [];
+		const parsed: unknown = JSON.parse(stripJsonComments(text));
+		if (!parsed || typeof parsed !== "object") return types;
+		const m = parsed as { modules?: unknown; header?: unknown };
+		const modules = Array.isArray(m.modules) ? m.modules : [];
 		for (const mod of modules) {
-			if (mod && typeof mod.type === "string") types.push(mod.type);
+			if (mod && typeof mod === "object" && typeof (mod as { type?: unknown }).type === "string") {
+				types.push((mod as { type: string }).type);
+			}
 		}
-		if (m?.header && typeof m.header.module_type === "string") {
-			types.push(m.header.module_type);
+		if (m.header && typeof m.header === "object" && typeof (m.header as { module_type?: unknown }).module_type === "string") {
+			types.push((m.header as { module_type: string }).module_type);
 		}
 	} catch {
 		// Not valid JSON (or commented) — ignore.
@@ -113,7 +144,11 @@ export function detectKind(files: FileMap): PackKind {
 	const types = new Set<string>();
 	for (const path of Object.keys(files)) {
 		if (baseName(path).toLowerCase() !== "manifest.json") continue;
-		for (const t of manifestTypes(decodeUtf8Sig(files[path]))) types.add(t);
+		try {
+			for (const t of manifestTypes(decodeUtf8Sig(files[path]))) types.add(t);
+		} catch {
+			// Ignore unreadable manifests.
+		}
 	}
 	const hasData = types.has("data");
 	const hasResources = types.has("resources");
@@ -128,9 +163,13 @@ export function manifestName(files: FileMap): string | null {
 	for (const path of Object.keys(files)) {
 		if (baseName(path).toLowerCase() !== "manifest.json") continue;
 		try {
-			const m = JSON.parse(stripJsonComments(decodeUtf8Sig(files[path])));
-			const name = m?.header?.name;
-			if (typeof name === "string" && name.trim()) return name.trim();
+			const parsed: unknown = JSON.parse(stripJsonComments(decodeUtf8Sig(files[path])));
+			if (!parsed || typeof parsed !== "object") continue;
+			const name = (parsed as { header?: unknown }).header;
+			if (name && typeof name === "object" && typeof (name as { name?: unknown }).name === "string") {
+				const n = ((name as { name: string }).name).trim();
+				if (n) return n;
+			}
 		} catch {
 			// Ignore.
 		}

@@ -3,6 +3,13 @@
 // Blocks2, April 2025 snapshot). After the 1.20.30 ID renames most names match
 // Java; this module only lists the remaining differences and the items that
 // do not exist in Bedrock at all.
+//
+// Performance notes:
+// - All static tables are precompiled into `Map`/`Set` lookups (O(1)) instead
+//   of linear `Object.entries` scans.
+// - `resolveBedrockItem` results are memoized in a bounded cache (cap 2000).
+// - `bedrockPotionDataList` results are built once and cached; callers get a
+//   copy so the cached order is never mutated.
 
 export interface BedrockItemResolution {
 	/** Bedrock item name (no namespace). */
@@ -142,6 +149,24 @@ const POTION_BASE_DATA: Record<string, number> = {
 	awkward_potion: 4,
 };
 
+// ---- Precompiled lookup Maps (built once, O(1) reads) ----
+
+/** Java name → Bedrock name for the entries in `RENAMES`. */
+const RENAME_MAP: ReadonlyMap<string, string> = new Map(Object.entries(RENAMES));
+
+/** Java name → fixed Bedrock data value for the entries in `DATA_VALUES`. */
+const DATA_VALUE_MAP: ReadonlyMap<string, number> = new Map(
+	Object.entries(DATA_VALUES).map(([k, v]) => [k, v] as [string, number])
+);
+
+/** Potion effect → [regular, extended, strong] data values. */
+const POTION_EFFECT_MAP: ReadonlyMap<string, readonly [number, number, number]> = new Map(
+	Object.entries(POTION_EFFECT_DATA)
+);
+
+/** Catalogue base-potion name → Bedrock data value. */
+const POTION_BASE_MAP: ReadonlyMap<string, number> = new Map(Object.entries(POTION_BASE_DATA));
+
 /** One selectable entry for the Bedrock potion / tipped-arrow dropdown. */
 export interface BedrockPotionEntry {
 	data: number;
@@ -160,12 +185,11 @@ const POTION_BASES: { base: string; data: number }[] = [
 	{ base: 'awkward', data: 4 },
 ];
 
-/**
- * Every valid Bedrock data value for a potion or tipped-arrow item, ordered by
- * data value. Arrow values are the potion values + 1 (source: minecraft.wiki
- * Potion / Tipped Arrow metadata tables).
- */
-export function bedrockPotionDataList(kind: 'potion' | 'arrow'): BedrockPotionEntry[] {
+// Cached potion/arrow dropdown lists (built once, returned as copies).
+let cachedPotionList: BedrockPotionEntry[] | null = null;
+let cachedArrowList: BedrockPotionEntry[] | null = null;
+
+function buildPotionList(kind: 'potion' | 'arrow'): BedrockPotionEntry[] {
 	const out: BedrockPotionEntry[] = [];
 	const offset = kind === 'arrow' ? 1 : 0;
 
@@ -181,7 +205,8 @@ export function bedrockPotionDataList(kind: 'potion' | 'arrow'): BedrockPotionEn
 		for (const b of POTION_BASES) out.push({ data: b.data, base: b.base });
 	}
 
-	for (const [effect, [regular, extended, strong]] of Object.entries(POTION_EFFECT_DATA)) {
+	for (const [effect, triple] of POTION_EFFECT_MAP) {
+		const [regular, extended, strong] = triple;
 		if (regular >= 0) out.push({ data: regular + offset, effect, variant: undefined });
 		if (extended >= 0) out.push({ data: extended + offset, effect, variant: 'extended' });
 		if (strong >= 0) out.push({ data: strong + offset, effect, variant: 'II' });
@@ -192,17 +217,45 @@ export function bedrockPotionDataList(kind: 'potion' | 'arrow'): BedrockPotionEn
 }
 
 /**
+ * Every valid Bedrock data value for a potion or tipped-arrow item, ordered by
+ * data value. Arrow values are the potion values + 1 (source: minecraft.wiki
+ * Potion / Tipped Arrow metadata tables).
+ *
+ * The list is built once per kind and cached; each call returns a shallow copy
+ * so callers can never mutate the cached order.
+ */
+export function bedrockPotionDataList(kind: 'potion' | 'arrow'): BedrockPotionEntry[] {
+	if (kind === 'arrow') {
+		if (!cachedArrowList) cachedArrowList = buildPotionList('arrow');
+		return cachedArrowList.slice();
+	}
+	if (!cachedPotionList) cachedPotionList = buildPotionList('potion');
+	return cachedPotionList.slice();
+}
+
+// Precompiled patterns for potion / colored resolution (avoid re-allocation).
+const POTION_NAME_RE = /^(?:(splash|lingering)_)?potion_of_([a-z_]+?)(?:_(II|extended))?$/;
+const BED_RE = /^([a-z_]+)_bed$/;
+const BANNER_RE = /^([a-z_]+)_banner$/;
+const MINECRAFT_PREFIX_RE = /^minecraft:/;
+
+// Bounded memoization for `resolveBedrockItem` (pure function of its input).
+const RESOLVE_CACHE_CAP = 2000;
+const resolveCache = new Map<string, BedrockItemResolution>();
+
+/**
  * Resolve the catalogue potion names (potion_of_swiftness_II,
  * splash_potion_of_healing, ...) to Bedrock potion data values.
  */
 function resolvePotion(name: string): BedrockItemResolution | null {
-	if (POTION_BASE_DATA[name] !== undefined) {
-		return { id: 'potion', data: POTION_BASE_DATA[name], available: true, renamed: true };
+	const baseData = POTION_BASE_MAP.get(name);
+	if (baseData !== undefined) {
+		return { id: 'potion', data: baseData, available: true, renamed: true };
 	}
-	const m = name.match(/^(?:(splash|lingering)_)?potion_of_([a-z_]+?)(?:_(II|extended))?$/);
+	const m = POTION_NAME_RE.exec(name);
 	if (!m) return null;
 	const [, form, effect, variant] = m;
-	const data = POTION_EFFECT_DATA[effect];
+	const data = POTION_EFFECT_MAP.get(effect);
 	if (!data) return null;
 	let value: number;
 	if (variant === 'II') value = data[2];
@@ -216,12 +269,12 @@ function resolvePotion(name: string): BedrockItemResolution | null {
 
 /** Beds and banners are `bed` / `banner` + a color data value in Bedrock. */
 function resolveColored(name: string): BedrockItemResolution | null {
-	const bed = name.match(/^([a-z_]+)_bed$/);
+	const bed = BED_RE.exec(name);
 	if (bed) {
 		const data = COLOR_DATA.get(bed[1]);
 		if (data !== undefined) return { id: 'bed', data, available: true, renamed: true };
 	}
-	const banner = name.match(/^([a-z_]+)_banner$/);
+	const banner = BANNER_RE.exec(name);
 	if (banner) {
 		const data = COLOR_DATA.get(banner[1]);
 		if (data !== undefined) return { id: 'banner', data, available: true, renamed: true };
@@ -229,25 +282,18 @@ function resolveColored(name: string): BedrockItemResolution | null {
 	return null;
 }
 
-/**
- * Resolve a Java item ID (with or without the minecraft: prefix) to the item
- * Bedrock /give should receive. Unknown names pass through unchanged.
- */
-export function resolveBedrockItem(javaId: string): BedrockItemResolution {
-	const name = javaId.replace(/^minecraft:/, '').trim();
-	if (!name) return { id: '', available: false };
-
+function resolveUncached(name: string): BedrockItemResolution {
 	const potion = resolvePotion(name);
 	if (potion) return potion;
 
 	const colored = resolveColored(name);
 	if (colored) return colored;
 
-	const renamed = RENAMES[name];
-	if (renamed) {
+	const renamed = RENAME_MAP.get(name);
+	if (renamed !== undefined) {
 		return {
 			id: renamed,
-			data: DATA_VALUES[name],
+			data: DATA_VALUE_MAP.get(name),
 			available: true,
 			renamed: true,
 		};
@@ -256,6 +302,27 @@ export function resolveBedrockItem(javaId: string): BedrockItemResolution {
 	if (UNAVAILABLE.has(name)) return { id: name, available: false };
 
 	// Same name in Bedrock; still apply a fixed data value when one exists.
-	const data = DATA_VALUES[name];
+	const data = DATA_VALUE_MAP.get(name);
 	return data !== undefined ? { id: name, data, available: true } : { id: name, available: true };
+}
+
+/**
+ * Resolve a Java item ID (with or without the minecraft: prefix) to the item
+ * Bedrock /give should receive. Unknown names pass through unchanged.
+ *
+ * Results are memoized: repeated lookups for the same ID return the cached
+ * resolution object (treated as read-only by callers).
+ */
+export function resolveBedrockItem(javaId: string): BedrockItemResolution {
+	const name = javaId.replace(MINECRAFT_PREFIX_RE, '').trim();
+	if (!name) return { id: '', available: false };
+
+	const cached = resolveCache.get(name);
+	if (cached) return cached;
+
+	const resolved = resolveUncached(name);
+	// Bounded cache: clear (rare) instead of unbounded growth.
+	if (resolveCache.size >= RESOLVE_CACHE_CAP) resolveCache.clear();
+	resolveCache.set(name, resolved);
+	return resolved;
 }

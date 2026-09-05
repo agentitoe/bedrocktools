@@ -1,11 +1,21 @@
+/** Shared singleton encoder/decoder: avoids per-call allocation. */
+const utf8Encoder = new TextEncoder();
+const utf8Decoder = new TextDecoder("utf-8");
+
+/**
+ * Decode UTF-8 bytes, stripping a leading BOM if present.
+ * Uses `subarray` (zero-copy view) instead of `slice` (copy).
+ */
 export function decodeUtf8Sig(data: Uint8Array): string {
-	let buf = data;
-	if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
-		buf = buf.slice(3);
+	if (data.length >= 3 && data[0] === 0xef && data[1] === 0xbb && data[2] === 0xbf) {
+		return utf8Decoder.decode(data.subarray(3));
 	}
-	return new TextDecoder("utf-8").decode(buf);
+	return utf8Decoder.decode(data);
 }
 
+/**
+ * Encode text as UTF-8 bytes via the shared encoder.
+ */
 export function encodeUtf8(text: string): Uint8Array {
-	return new TextEncoder().encode(text);
+	return utf8Encoder.encode(text);
 }

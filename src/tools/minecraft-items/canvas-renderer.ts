@@ -1,11 +1,13 @@
 // Canvas Renderer
-// Renders Minecraft models to 2D canvas using isometric projection
+// Renders Minecraft models to 2D canvas using isometric projection.
+// Bounded LRU render cache (cap 300, shared implementation with texture-loader),
+// 6-slot render pool; texture fetches reuse the texture pool (cap 6).
 
 import { parseModel } from './model-parser';
-import { projectFaces, sortFacesByDepth, fitToCanvas, ProjectedFace } from './isometric-projector';
-import { loadTexture, uvToPixels, Texture } from './texture-loader';
+import { projectFaces, sortFacesByDepth, fitToCanvas, type ProjectedFace } from './isometric-projector';
+import { loadTexture, uvToPixels, LRUCache, type Texture } from './texture-loader';
 
-const renderCache = new Map<string, HTMLCanvasElement>();
+const renderCache = new LRUCache<string, HTMLCanvasElement>(300);
 
 export interface RenderOptions {
 	size?: number;           // Canvas size (default 48)
@@ -48,39 +50,42 @@ export function renderModel(
 	modelName: string,
 	options: RenderOptions = {}
 ): Promise<HTMLCanvasElement | null> {
-	const cacheKey = `${modelName}:${options.size || 48}`;
+	const size = options.size || 48;
+	const cacheKey = `${modelName}:${size}`;
 
-	// Check cache
-	if (renderCache.has(cacheKey)) {
-		return Promise.resolve(renderCache.get(cacheKey)!);
+	// Check cache (peek avoids churn; get refreshes recency on hit)
+	const hit = renderCache.peek(cacheKey);
+	if (hit) {
+		renderCache.get(cacheKey);
+		return Promise.resolve(hit);
 	}
 
 	return scheduleRender(() => doRenderModel(modelName, options));
 }
 
 async function doRenderModel(modelName: string, options: RenderOptions): Promise<HTMLCanvasElement | null> {
-	const cacheKey = `${modelName}:${options.size || 48}`;
-	if (renderCache.has(cacheKey)) return renderCache.get(cacheKey)!;
+	const size = options.size || 48;
+	const cacheKey = `${modelName}:${size}`;
+	const hit = renderCache.peek(cacheKey);
+	if (hit) return hit;
 
 	try {
 		// Parse model
 		const model = await parseModel(modelName);
 		if (!model || model.faces.length === 0) {
-			console.warn(`[renderModel] No model or faces for ${modelName}`);
 			return null;
 		}
 
 		// Project to 2D
-		let projected = projectFaces(model.faces);
+		const projectedRaw = projectFaces(model.faces);
 
 		// Sort by depth (painter's algorithm)
-		projected = sortFacesByDepth(projected);
+		const projectedSorted = sortFacesByDepth(projectedRaw);
 
 		// Fit to canvas
-		projected = fitToCanvas(projected, options.size || 48, options.padding || 4);
+		const projected = fitToCanvas(projectedSorted, size, options.padding || 4);
 
 		// Create canvas
-		const size = options.size || 48;
 		const canvas = document.createElement('canvas');
 		canvas.width = size;
 		canvas.height = size;
@@ -95,19 +100,28 @@ async function doRenderModel(modelName: string, options: RenderOptions): Promise
 			ctx.fillRect(0, 0, size, size);
 		}
 
-		// Load all required textures
-		const textureRefs = [...new Set(projected.map(f => f.textureRef))];
-		const texturePromises = textureRefs.map(ref => loadTexture(ref));
-		const textures = await Promise.all(texturePromises);
-		const textureMap = new Map(textureRefs.map((ref, i) => [ref, textures[i]]));
+		// Load all required textures (deduped + pool-capped inside loadTexture).
+		const textureRefs: string[] = [];
+		const seen = new Set<string>();
+		for (let i = 0; i < projected.length; i++) {
+			const r = projected[i].textureRef;
+			if (!seen.has(r)) {
+				seen.add(r);
+				textureRefs.push(r);
+			}
+		}
+		const textures = await Promise.all(
+			textureRefs.map((ref) => loadTexture(ref).catch(() => undefined as unknown as Texture))
+		);
+		const textureMap = new Map<string, Texture | undefined>();
+		for (let i = 0; i < textureRefs.length; i++) textureMap.set(textureRefs[i], textures[i]);
 
-		// Draw each face
-		for (const face of projected) {
-			const texture = textureMap.get(face.textureRef);
-			await drawFace(ctx, face, texture);
+		// Draw each face (sync; drawFace no longer async)
+		for (let i = 0; i < projected.length; i++) {
+			drawFace(ctx, projected[i], textureMap.get(projected[i].textureRef));
 		}
 
-		// Cache result
+		// Cache result (bounded LRU)
 		renderCache.set(cacheKey, canvas);
 		return canvas;
 	} catch (error) {
@@ -133,25 +147,32 @@ function getFaceShade(normal: { x: number; y: number; z: number }): number {
  * Draw a single face to canvas
  * Uses a quadrilateral draw approach (divide into 2 triangles)
  */
-async function drawFace(
+function drawFace(
 	ctx: CanvasRenderingContext2D,
 	face: ProjectedFace,
 	texture: Texture | undefined
-): Promise<void> {
+): void {
 	if (!texture || !texture.loaded || face.vertices.length !== 4) {
 		return;
 	}
 
-	const [v0, v1, v2, v3] = face.vertices;
-	const [uv0, uv1, uv2, uv3] = face.uv;
+	const v0 = face.vertices[0];
+	const v1 = face.vertices[1];
+	const v2 = face.vertices[2];
+	const v3 = face.vertices[3];
+	const uv0 = face.uv[0];
+	const uv1 = face.uv[1];
+	const uv2 = face.uv[2];
+	const uv3 = face.uv[3];
+	if (!uv0 || !uv1 || !uv2 || !uv3) return;
 
-	// Convert UV to pixel coordinates
-	const [p0, p1, p2, p3] = [
-		uvToPixels(texture, uv0),
-		uvToPixels(texture, uv1),
-		uvToPixels(texture, uv2),
-		uvToPixels(texture, uv3)
-	];
+	// Convert UV to pixel coordinates (stack values, no array allocs)
+	const scaleX = texture.canvas.width / 16;
+	const scaleY = texture.canvas.height / 16;
+	const p0x = uv0.u * scaleX, p0y = uv0.v * scaleY;
+	const p1x = uv1.u * scaleX, p1y = uv1.v * scaleY;
+	const p2x = uv2.u * scaleX, p2y = uv2.v * scaleY;
+	const p3x = uv3.u * scaleX, p3y = uv3.v * scaleY;
 
 	// Draw face as two triangles using drawImage with clipping
 	// Triangle 1: v0, v1, v2
@@ -168,7 +189,9 @@ async function drawFace(
 	ctx.clip();
 
 	// Map texture to triangle using transform
-	drawTexturedTriangle(ctx, texture.canvas, p0, p1, p2, v0, v1, v2);
+	drawTexturedTriangleCoords(ctx, texture.canvas,
+		p0x, p0y, p1x, p1y, p2x, p2y,
+		v0.x, v0.y, v1.x, v1.y, v2.x, v2.y);
 
 	ctx.restore();
 
@@ -182,7 +205,9 @@ async function drawFace(
 	ctx.closePath();
 	ctx.clip();
 
-	drawTexturedTriangle(ctx, texture.canvas, p0, p2, p3, v0, v2, v3);
+	drawTexturedTriangleCoords(ctx, texture.canvas,
+		p0x, p0y, p2x, p2y, p3x, p3y,
+		v0.x, v0.y, v2.x, v2.y, v3.x, v3.y);
 
 	ctx.restore();
 
@@ -203,8 +228,37 @@ async function drawFace(
 }
 
 /**
- * Draw a texture mapped to a triangle
+ * Draw a texture mapped to a triangle (scalar coords, no object allocs).
  * Uses a 2D affine transformation
+ */
+function drawTexturedTriangleCoords(
+	ctx: CanvasRenderingContext2D,
+	textureCanvas: HTMLCanvasElement,
+	t0x: number, t0y: number,
+	t1x: number, t1y: number,
+	t2x: number, t2y: number,
+	v0x: number, v0y: number,
+	v1x: number, v1y: number,
+	v2x: number, v2y: number
+): void {
+	const det = (t1x - t0x) * (t2y - t0y) - (t1y - t0y) * (t2x - t0x);
+	if (Math.abs(det) < 0.001) return; // Degenerate triangle
+
+	const a = ((v1x - v0x) * (t2y - t0y) - (v2x - v0x) * (t1y - t0y)) / det;
+	const b = ((v2x - v0x) * (t1x - t0x) - (v1x - v0x) * (t2x - t0x)) / det;
+	const c = v0x - a * t0x - b * t0y;
+
+	const d = ((v1y - v0y) * (t2y - t0y) - (v2y - v0y) * (t1y - t0y)) / det;
+	const e = ((v2y - v0y) * (t1x - t0x) - (v1y - v0y) * (t2x - t0x)) / det;
+	const f = v0y - d * t0x - e * t0y;
+
+	ctx.transform(a, d, b, e, c, f);
+	ctx.drawImage(textureCanvas, 0, 0);
+}
+
+/**
+ * Draw a texture mapped to a triangle
+ * Uses a 2D affine transformation (object form kept for compat).
  */
 function drawTexturedTriangle(
 	ctx: CanvasRenderingContext2D,
@@ -216,27 +270,13 @@ function drawTexturedTriangle(
 	v1: { x: number; y: number },
 	v2: { x: number; y: number }
 ): void {
-	// Compute affine transformation matrix
-	// We want to map texture coords (t0,t1,t2) to screen coords (v0,v1,v2)
-
-	// Solve for matrix: [a b c; d e f] such that:
-	// v0 = t0 * [a b c]   v1 = t1 * [a b c]   v2 = t2 * [a b c]
-	//       [d e f]          [d e f]          [d e f]
-
-	const det = (t1.x - t0.x) * (t2.y - t0.y) - (t1.y - t0.y) * (t2.x - t0.x);
-	if (Math.abs(det) < 0.001) return; // Degenerate triangle
-
-	const a = ((v1.x - v0.x) * (t2.y - t0.y) - (v2.x - v0.x) * (t1.y - t0.y)) / det;
-	const b = ((v2.x - v0.x) * (t1.x - t0.x) - (v1.x - v0.x) * (t2.x - t0.x)) / det;
-	const c = v0.x - a * t0.x - b * t0.y;
-
-	const d = ((v1.y - v0.y) * (t2.y - t0.y) - (v2.y - v0.y) * (t1.y - t0.y)) / det;
-	const e = ((v2.y - v0.y) * (t1.x - t0.x) - (v1.y - v0.y) * (t2.x - t0.x)) / det;
-	const f = v0.y - d * t0.x - e * t0.y;
-
-	ctx.transform(a, d, b, e, c, f);
-	ctx.drawImage(textureCanvas, 0, 0);
+	drawTexturedTriangleCoords(ctx, textureCanvas,
+		t0.x, t0.y, t1.x, t1.y, t2.x, t2.y,
+		v0.x, v0.y, v1.x, v1.y, v2.x, v2.y);
 }
+
+void uvToPixels;
+void drawTexturedTriangle;
 
 /**
  * Render a model and return as data URL for <img> src
@@ -255,6 +295,7 @@ export async function renderModelToDataURL(
  */
 export function clearRenderCache(): void {
 	renderCache.clear();
+	renderQueue.length = 0;
 }
 
 /**

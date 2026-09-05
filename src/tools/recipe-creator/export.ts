@@ -16,6 +16,22 @@ function itemIdentifier(id: number | null): string | null {
 	return getItemIdentifier(item);
 }
 
+/**
+ * Fallback used when a numeric ingredient id no longer resolves to an item
+ * (e.g. its custom item was dropped). Guarantees exported JSON never contains
+ * `{ "item": null }`; every substitution is logged as a warning.
+ */
+const FALLBACK_ITEM = 'minecraft:stone';
+
+function safeItemIdentifier(id: number | null): string {
+	const ident = itemIdentifier(id);
+	if (ident) return ident;
+	if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+		console.warn(`[recipe-creator] Unknown item id ${String(id)}; using fallback ${FALLBACK_ITEM}`);
+	}
+	return FALLBACK_ITEM;
+}
+
 // ---- Bedrock (addon .mcpack) ----
 
 function buildShapedLayout(r: RecipeState): { pattern: string[]; charToItemId: Map<string, number> } | null {
@@ -76,8 +92,9 @@ function buildRecipeJSON(r: RecipeState): { filename: string; json: object } | {
 		const shaped = buildShapedLayout(r);
 		if (!shaped) return { error: t.errorNoIngredients };
 		// Bedrock 1.20.10 expects item objects here (vanilla recipe files use { "item": ... }).
+		// Unresolvable ids fall back to stone (warned) instead of emitting { "item": null }.
 		const key: Record<string, { item: string }> = {};
-		for (const [ch, id] of shaped.charToItemId) key[ch] = { item: itemIdentifier(id)! };
+		for (const [ch, id] of shaped.charToItemId) key[ch] = { item: safeItemIdentifier(id) };
 		return {
 			filename: recipeFilename(r),
 			json: {
@@ -104,7 +121,7 @@ function buildRecipeJSON(r: RecipeState): { filename: string; json: object } | {
 				'minecraft:recipe_shapeless': {
 					description: { identifier: r.identifier },
 					tags: ['crafting_table'],
-					ingredients: r.ingredients.map((id) => ({ item: itemIdentifier(id) })),
+					ingredients: r.ingredients.map((id) => ({ item: safeItemIdentifier(id) })),
 					unlock: { context: 'AlwaysUnlocked' },
 					result: resultDescriptor(r.resultId, r.resultCount)
 				}
@@ -115,6 +132,10 @@ function buildRecipeJSON(r: RecipeState): { filename: string; json: object } | {
 	// furnace
 	if (r.input == null) return { error: t.errorNoInput };
 	if (r.output == null) return { error: t.errorNoOutput };
+	const furnaceInput = itemIdentifier(r.input);
+	if (!furnaceInput) return { error: t.errorNoInput };
+	const furnaceOutput = itemIdentifier(r.output);
+	if (!furnaceOutput) return { error: t.errorNoOutput };
 	return {
 		filename: recipeFilename(r),
 		json: {
@@ -122,8 +143,8 @@ function buildRecipeJSON(r: RecipeState): { filename: string; json: object } | {
 			'minecraft:recipe_furnace': {
 				description: { identifier: r.identifier },
 				tags: [r.furnaceTag],
-				input: itemIdentifier(r.input),
-				output: itemIdentifier(r.output)
+				input: furnaceInput,
+				output: furnaceOutput
 			}
 		}
 	};
@@ -176,7 +197,7 @@ function buildJavaRecipeJSON(r: RecipeState): { filename: string; json: object }
 		const shaped = buildShapedLayout(r);
 		if (!shaped) return { error: t.errorNoIngredients };
 		const key: Record<string, string> = {};
-		for (const [ch, id] of shaped.charToItemId) key[ch] = itemIdentifier(id)!;
+		for (const [ch, id] of shaped.charToItemId) key[ch] = safeItemIdentifier(id);
 		const result = javaResultDescriptor(r.resultId, r.resultCount);
 		if (!result) return { error: t.errorNoResult };
 		return {
@@ -199,7 +220,7 @@ function buildJavaRecipeJSON(r: RecipeState): { filename: string; json: object }
 			filename,
 			json: {
 				type: 'minecraft:crafting_shapeless',
-				ingredients: r.ingredients.map((id) => itemIdentifier(id)),
+				ingredients: r.ingredients.map((id) => safeItemIdentifier(id)),
 				result
 			}
 		};
@@ -209,13 +230,15 @@ function buildJavaRecipeJSON(r: RecipeState): { filename: string; json: object }
 	if (r.input == null) return { error: t.errorNoInput };
 	if (r.output == null) return { error: t.errorNoOutput };
 	const cooking = JAVA_COOKING[r.furnaceTag];
+	const javaInput = itemIdentifier(r.input);
+	if (!javaInput) return { error: t.errorNoInput };
 	const result = javaResultDescriptor(r.output);
 	if (!result) return { error: t.errorNoOutput };
 	return {
 		filename,
 		json: {
 			type: cooking.type,
-			ingredient: itemIdentifier(r.input),
+			ingredient: javaInput,
 			result,
 			experience: 0.1,
 			cookingtime: cooking.cookingtime
@@ -256,15 +279,20 @@ function buildManifest(): object {
 	};
 }
 
-let packIconPromise: Promise<Uint8Array | null> | null = null;
-function getPackIcon(): Promise<Uint8Array | null> {
-	if (!packIconPromise) {
-		packIconPromise = fetch('/assets/pack-icon.png')
-			.then((res) => (res.ok ? res.arrayBuffer() : Promise.resolve(null)))
-			.then((buf) => (buf ? new Uint8Array(buf) : null))
-			.catch(() => null);
+// Cached pack icon (success only — failures retry on the next export).
+let packIconCache: Uint8Array | null = null;
+async function getPackIcon(): Promise<Uint8Array | null> {
+	if (packIconCache) return packIconCache;
+	try {
+		const res = await fetch('/assets/pack-icon.png');
+		if (!res.ok) return null;
+		const buf = await res.arrayBuffer();
+		if (!buf || buf.byteLength === 0) return null;
+		packIconCache = new Uint8Array(buf);
+		return packIconCache;
+	} catch {
+		return null;
 	}
-	return packIconPromise;
 }
 
 // ---- Round-trip (repackage an imported addon / data pack with edited recipes) ----

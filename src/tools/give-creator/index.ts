@@ -2,32 +2,68 @@
 // Build custom /give commands for Minecraft Java and Bedrock. Picks an item
 // from the shared items.json catalogue and lets you configure every platform
 // component through a generic option form; the command updates live.
+//
+// Structure of this module:
+// - STATE: catalogue arrays + O(1) lookup Maps (built once in `loadItems`).
+// - RENDER: pure-ish DOM builders (picker, form, preview, output).
+// - EVENTS: wiring (delegated where lists can grow large, debounced searches).
 
 import { initUi } from '../../shared/ui';
 import type { FieldDef, FieldOption, GiveTranslations, ItemData, Platform } from './types';
 import { translations } from './translations';
 import { sectionsFor } from './options';
 import { resetValues, setPlatform, setValue, state } from './state';
+import { setCatalogue, catalogueGetByName } from './data';
 import { buildCommand } from './builder';
 import { bedrockPotionDataList, resolveBedrockItem } from './bedrock-ids';
 import type { BedrockPotionEntry } from './bedrock-ids';
 import { createImgTag } from './images';
 
+// ---- STATE ----
+
 let currentLang = 'es';
 let allItems: ItemData[] = [];
 let potionItems: ItemData[] = []; // synthetic potions (id >= 900000), only shown on Bedrock
+/** Bare-name → item for the current catalogue (rebuilt in `loadItems`). */
+let itemByName = new Map<string, ItemData>();
 
-function findItem(name: string): ItemData | undefined {
-	const bare = name.replace(/^minecraft:/, '').trim();
-	return allItems.find((i) => i.name === bare) || potionItems.find((i) => i.name === bare);
+function rebuildItemIndex(): void {
+	setCatalogue([...allItems, ...potionItems]);
+	itemByName = new Map<string, ItemData>();
+	for (const item of allItems) {
+		const key = item.name.toLowerCase();
+		if (!itemByName.has(key)) itemByName.set(key, item);
+	}
+	for (const item of potionItems) {
+		const key = item.name.toLowerCase();
+		if (!itemByName.has(key)) itemByName.set(key, item);
+	}
 }
 
-function escapeHtml(s: string): string {
+function findItem(name: string): ItemData | undefined {
+	const bare = name.replace(/^minecraft:/, '').trim().toLowerCase();
+	return itemByName.get(bare) ?? catalogueGetByName(bare);
+}
+
+/** Central HTML escaper for this tool (covers `&<>"'`). */
+export function escapeHtml(s: string): string {
 	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function t(): GiveTranslations {
 	return translations[currentLang];
+}
+
+/** Trailing-edge debounce (search inputs, quick search). */
+function debounce<F extends (...args: never[]) => void>(fn: F, ms: number): F {
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	return ((...args: never[]) => {
+		if (timer !== null) clearTimeout(timer);
+		timer = setTimeout(() => {
+			timer = null;
+			fn(...args);
+		}, ms);
+	}) as F;
 }
 
 // ---- Item picker (all items, filtered by category + search, chunked render) ----
@@ -65,6 +101,7 @@ function pickerItems(): ItemData[] {
 let pickerFiltered: ItemData[] = [];
 let pickerRendered = 0;
 const PICKER_CHUNK = 240;
+let pickerChunkScheduled = false;
 
 function pickerMatches(item: ItemData, query: string, category: CategoryKey): boolean {
 	if (category !== 'all' && itemCategory(item) !== category) return false;
@@ -74,10 +111,11 @@ function pickerMatches(item: ItemData, query: string, category: CategoryKey): bo
 		|| item.name.includes(query);
 }
 
-function buildPickerItem(item: ItemData): HTMLElement {
+function buildPickerItem(item: ItemData, index: number): HTMLElement {
 	const btn = document.createElement('button');
 	btn.type = 'button';
 	btn.className = 'picker-item';
+	btn.dataset.index = String(index);
 	btn.appendChild(createImgTag(item, 48));
 	const meta = document.createElement('div');
 	meta.className = 'picker-meta';
@@ -90,21 +128,31 @@ function buildPickerItem(item: ItemData): HTMLElement {
 	meta.appendChild(name);
 	meta.appendChild(id);
 	btn.appendChild(meta);
-	btn.addEventListener('click', () => {
-		selectItem(item);
-		btn.closest('.picker-overlay')?.remove();
-	});
 	return btn;
 }
 
 function renderPickerChunk() {
+	pickerChunkScheduled = false;
 	const grid = document.getElementById('pickerGrid');
 	if (!grid) return;
 	const end = Math.min(pickerFiltered.length, pickerRendered + PICKER_CHUNK);
+	if (end <= pickerRendered) return;
+	const frag = document.createDocumentFragment();
 	for (let i = pickerRendered; i < end; i++) {
-		grid.appendChild(buildPickerItem(pickerFiltered[i]));
+		frag.appendChild(buildPickerItem(pickerFiltered[i], i));
 	}
+	grid.appendChild(frag);
 	pickerRendered = end;
+}
+
+function schedulePickerChunk() {
+	if (pickerChunkScheduled) return;
+	pickerChunkScheduled = true;
+	if (typeof requestAnimationFrame === 'function') {
+		requestAnimationFrame(renderPickerChunk);
+	} else {
+		setTimeout(renderPickerChunk, 0);
+	}
 }
 
 function resetPickerList(query: string, category: CategoryKey) {
@@ -118,6 +166,8 @@ function resetPickerList(query: string, category: CategoryKey) {
 		grid.innerHTML = `<p class="picker-empty">${t().pickerEmpty}</p>`;
 		return;
 	}
+	// First chunk renders synchronously so the dialog never looks empty;
+	// further chunks stream in via scroll + rAF.
 	renderPickerChunk();
 }
 
@@ -144,23 +194,42 @@ function openPicker(initialQuery = '') {
 
 	const search = overlay.querySelector('#pickerSearch') as HTMLInputElement;
 	const grid = overlay.querySelector('#pickerGrid') as HTMLElement;
+	const cats = overlay.querySelector('#pickerCats') as HTMLElement;
 
 	let category: CategoryKey = 'all';
 	const apply = () => resetPickerList(search.value, category);
+	const debouncedApply = debounce(apply, 150);
 
 	overlay.querySelector('.picker-close')?.addEventListener('click', () => overlay.remove());
 	overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-	search.addEventListener('input', apply);
-	overlay.querySelectorAll('.cat-chip').forEach((chip) => {
-		chip.addEventListener('click', () => {
-			overlay.querySelectorAll('.cat-chip').forEach((c) => c.classList.remove('active'));
-			chip.classList.add('active');
-			category = (chip as HTMLElement).getAttribute('data-cat') as CategoryKey;
-			apply();
-		});
+	search.addEventListener('input', debouncedApply);
+	// Category chips: one delegated listener instead of one per chip.
+	cats.addEventListener('click', (e) => {
+		const chip = (e.target as HTMLElement).closest('.cat-chip') as HTMLElement | null;
+		if (!chip) return;
+		cats.querySelectorAll('.cat-chip').forEach((c) => c.classList.remove('active'));
+		chip.classList.add('active');
+		category = chip.getAttribute('data-cat') as CategoryKey;
+		apply();
 	});
+	// Picker rows: one delegated listener for all (present + future) chunks.
+	grid.addEventListener('click', (e) => {
+		const btn = (e.target as HTMLElement).closest('.picker-item') as HTMLElement | null;
+		if (!btn) return;
+		const item = pickerFiltered[parseInt(btn.dataset.index || '-1', 10)];
+		if (!item) return;
+		selectItem(item);
+		btn.closest('.picker-overlay')?.remove();
+	});
+	let scrollTicking = false;
 	grid.addEventListener('scroll', () => {
-		if (grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 300) renderPickerChunk();
+		if (scrollTicking) return;
+		scrollTicking = true;
+		const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout;
+		schedule(() => {
+			scrollTicking = false;
+			if (grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 300) schedulePickerChunk();
+		});
 	});
 
 	search.value = initialQuery;
@@ -171,6 +240,37 @@ function openPicker(initialQuery = '') {
 
 // ---- Quick search (mini dropdown in the main card) ----
 
+function paintQuickResults(matches: ItemData[]) {
+	const list = document.getElementById('quickResults');
+	if (!list) return;
+	if (matches.length === 0) {
+		list.innerHTML = `<div class="quick-empty">${t().pickerEmpty}</div>`;
+		list.style.display = '';
+		return;
+	}
+	list.innerHTML = '';
+	const frag = document.createDocumentFragment();
+	for (let i = 0; i < matches.length; i++) {
+		const item = matches[i];
+		const row = document.createElement('button');
+		row.type = 'button';
+		row.className = 'quick-row';
+		row.dataset.index = String(i);
+		row.appendChild(createImgTag(item, 28));
+		const span = document.createElement('span');
+		span.textContent = currentLang === 'es' && item.displayNameEs ? item.displayNameEs : item.displayName;
+		const code = document.createElement('code');
+		code.textContent = 'minecraft:' + item.name;
+		row.appendChild(span);
+		row.appendChild(code);
+		frag.appendChild(row);
+	}
+	list.appendChild(frag);
+	list.style.display = '';
+	// Stash the current matches for the delegated click handler.
+	(list as HTMLElement & { __matches?: ItemData[] }).__matches = matches;
+}
+
 function runQuickSearch(query: string) {
 	const list = document.getElementById('quickResults');
 	if (!list) return;
@@ -180,35 +280,32 @@ function runQuickSearch(query: string) {
 		list.style.display = 'none';
 		return;
 	}
+	// Bounded: never build more than 8 rows per keystroke.
 	const matches = pickerItems().filter((item) => pickerMatches(item, q, 'all')).slice(0, 8);
-	if (matches.length === 0) {
-		list.innerHTML = `<div class="quick-empty">${t().pickerEmpty}</div>`;
-		list.style.display = '';
-		return;
-	}
-	list.innerHTML = '';
-	for (const item of matches) {
-		const row = document.createElement('button');
-		row.type = 'button';
-		row.className = 'quick-row';
-		row.appendChild(createImgTag(item, 28));
-		const span = document.createElement('span');
-		span.textContent = currentLang === 'es' && item.displayNameEs ? item.displayNameEs : item.displayName;
-		const code = document.createElement('code');
-		code.textContent = 'minecraft:' + item.name;
-		row.appendChild(span);
-		row.appendChild(code);
-		row.addEventListener('mousedown', (e) => e.preventDefault());
-		row.addEventListener('click', () => {
-			selectItem(item);
-			list.innerHTML = '';
-			list.style.display = 'none';
-			const input = document.getElementById('quickSearch') as HTMLInputElement | null;
-			if (input) input.value = '';
-		});
-		list.appendChild(row);
-	}
-	list.style.display = '';
+	paintQuickResults(matches);
+}
+
+const debouncedQuickSearch = debounce(runQuickSearch, 150);
+
+function wireQuickResultsOnce() {
+	const list = document.getElementById('quickResults');
+	if (!list || (list as HTMLElement & { __wired?: boolean }).__wired) return;
+	(list as HTMLElement & { __wired?: boolean }).__wired = true;
+	list.addEventListener('mousedown', (e) => {
+		if ((e.target as HTMLElement).closest('.quick-row')) e.preventDefault();
+	});
+	list.addEventListener('click', (e) => {
+		const row = (e.target as HTMLElement).closest('.quick-row') as HTMLElement | null;
+		if (!row) return;
+		const matches = (list as HTMLElement & { __matches?: ItemData[] }).__matches || [];
+		const item = matches[parseInt(row.dataset.index || '-1', 10)];
+		if (!item) return;
+		selectItem(item);
+		list.innerHTML = '';
+		list.style.display = 'none';
+		const input = document.getElementById('quickSearch') as HTMLInputElement | null;
+		if (input) input.value = '';
+	});
 }
 
 // ---- Item selection + Bedrock resolution ----
@@ -322,7 +419,7 @@ function renderBedrockInfo() {
 	el.textContent = `${t().bedrockResolved} minecraft:${resolved.id}${resolved.data !== undefined ? ` · ${t().bedrockResolvedData} ${resolved.data}` : ''}`;
 }
 
-// ---- Generic option form ----
+// ---- Generic option form (render) ----
 
 function optsHtml(options: FieldOption[] | undefined, value: unknown, lang: GiveTranslations): string {
 	if (!options) return '';
@@ -423,38 +520,79 @@ function findField(key: string): FieldDef | undefined {
 	return undefined;
 }
 
-function wireFields(container: HTMLElement) {
-	container.querySelectorAll<HTMLElement>('[data-key]').forEach((el) => {
-		const key = el.getAttribute('data-key')!;
-		const evt = el instanceof HTMLSelectElement ? 'change' : 'input';
-		el.addEventListener(evt, () => {
-			setValue(key, readControl(el));
-			renderOutput();
-		});
-	});
+// ---- Generic option form (events: single delegated listener set) ----
 
-	container.querySelectorAll<HTMLElement>('[data-row-key]').forEach((el) => {
+/**
+ * Wire the option form with three delegated listeners (input/change/click) on
+ * the container. Replaces the previous per-control listener fan-out, so forms
+ * with hundreds of row inputs cost O(1) listeners. Idempotent across
+ * `renderSections()` re-renders (the container element itself persists).
+ */
+function wireFields(container: HTMLElement) {
+	if ((container as HTMLElement & { __wired?: boolean }).__wired) return;
+	(container as HTMLElement & { __wired?: boolean }).__wired = true;
+
+	const readKey = (el: HTMLElement): string | null => el.getAttribute('data-key');
+	const readRowKey = (el: HTMLElement): { listKey: string; subKey: string; index: number } | null => {
+		const subKey = el.getAttribute('data-row-key');
+		if (!subKey) return null;
 		const listEl = el.closest<HTMLElement>('[data-list]');
-		if (!listEl) return;
-		const listKey = listEl.getAttribute('data-list')!;
-		const subKey = el.getAttribute('data-row-key')!;
-		const index = parseInt(el.getAttribute('data-index') || '0', 10);
-		const evt = el instanceof HTMLSelectElement ? 'change' : 'input';
-		el.addEventListener(evt, () => {
-			const list = state.values[listKey];
-			if (Array.isArray(list) && list[index]) {
-				(list[index] as Record<string, unknown>)[subKey] = readControl(el);
+		if (!listEl) return null;
+		return {
+			listKey: listEl.getAttribute('data-list')!,
+			subKey,
+			index: parseInt(el.getAttribute('data-index') || '0', 10),
+		};
+	};
+
+	// Text/number/textarea/checkbox writes (selects are handled on 'change').
+	container.addEventListener('input', (e) => {
+		const target = e.target as HTMLElement | null;
+		if (!target || target instanceof HTMLSelectElement) return;
+		if (readKey(target)) {
+			setValue(readKey(target)!, readControl(target));
+			renderOutput();
+			return;
+		}
+		const row = target instanceof HTMLElement ? readRowKey(target) : null;
+		if (row) {
+			const list = state.values[row.listKey];
+			if (Array.isArray(list) && list[row.index]) {
+				(list[row.index] as Record<string, unknown>)[row.subKey] = readControl(target);
 			}
 			renderOutput();
-		});
+		}
 	});
 
-	container.querySelectorAll<HTMLButtonElement>('[data-remove]').forEach((btn) => {
-		btn.addEventListener('click', () => {
-			const listEl = btn.closest<HTMLElement>('[data-list]');
+	// Select writes.
+	container.addEventListener('change', (e) => {
+		const target = e.target as HTMLElement | null;
+		if (!target || !(target instanceof HTMLSelectElement)) return;
+		if (readKey(target)) {
+			setValue(readKey(target)!, readControl(target));
+			renderOutput();
+			return;
+		}
+		const row = readRowKey(target);
+		if (row) {
+			const list = state.values[row.listKey];
+			if (Array.isArray(list) && list[row.index]) {
+				(list[row.index] as Record<string, unknown>)[row.subKey] = readControl(target);
+			}
+			renderOutput();
+		}
+	});
+
+	// Add/remove list rows (delegation with data-action attributes).
+	container.addEventListener('click', (e) => {
+		const target = e.target as HTMLElement | null;
+		if (!target) return;
+		const removeBtn = target.closest<HTMLButtonElement>('[data-remove]');
+		if (removeBtn && container.contains(removeBtn)) {
+			const listEl = removeBtn.closest<HTMLElement>('[data-list]');
 			if (!listEl) return;
 			const listKey = listEl.getAttribute('data-list')!;
-			const index = parseInt(btn.getAttribute('data-remove') || '0', 10);
+			const index = parseInt(removeBtn.getAttribute('data-remove') || '0', 10);
 			const list = state.values[listKey];
 			if (Array.isArray(list)) {
 				list.splice(index, 1);
@@ -462,19 +600,18 @@ function wireFields(container: HTMLElement) {
 			}
 			renderSections();
 			renderOutput();
-		});
-	});
-
-	container.querySelectorAll<HTMLButtonElement>('[data-add]').forEach((btn) => {
-		btn.addEventListener('click', () => {
-			const key = btn.getAttribute('data-add')!;
+			return;
+		}
+		const addBtn = target.closest<HTMLButtonElement>('[data-add]');
+		if (addBtn && container.contains(addBtn)) {
+			const key = addBtn.getAttribute('data-add')!;
 			const list = Array.isArray(state.values[key]) ? (state.values[key] as Record<string, unknown>[]) : [];
 			const field = findField(key);
 			list.push(newRow(field?.listFields || []));
 			setValue(key, list);
 			renderSections();
 			renderOutput();
-		});
+		}
 	});
 }
 
@@ -508,12 +645,19 @@ const MC_COLOR_HEX: Record<string, string> = {
 	red: '#FF5555', light_purple: '#FF55FF', yellow: '#FFFF55', white: '#FFFFFF',
 };
 
+const ROMAN_TABLE: [number, string][] = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+const romanCache = new Map<number, string>();
+
 function romanNumeral(n: number): string {
-	const table: [number, string][] = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+	const hit = romanCache.get(n);
+	if (hit !== undefined) return hit;
 	let out = '';
-	for (const [v, sym] of table) {
-		while (n >= v) { out += sym; n -= v; }
+	let rest = n;
+	for (const [v, sym] of ROMAN_TABLE) {
+		while (rest >= v) { out += sym; rest -= v; }
 	}
+	if (romanCache.size >= 500) romanCache.clear();
+	romanCache.set(n, out);
 	return out;
 }
 
@@ -747,22 +891,23 @@ async function initTool() {
 
 	currentLang = initUi(translations, uiHooks);
 
-	// Platform switch
-	document.querySelectorAll('.platform-tab').forEach((tab) => {
-		tab.addEventListener('click', () => {
-			const p = tab.getAttribute('data-platform');
-			if (p === 'java' || p === 'bedrock') {
-				// Synthetic potion names are only valid Bedrock IDs; on Java fall
-				// back to the generic potion item (customisable via the potion section).
-				if (p === 'java' && potionItems.some((i) => i.name === state.itemId.replace(/^minecraft:/, ''))) {
-					state.itemId = 'minecraft:potion';
-					if (itemIdInput) itemIdInput.value = state.itemId;
-				}
-				setPlatform(p as Platform);
-				applyPlatformUI();
-				renderSections();
+	// Platform switch (delegated: two tabs, one listener on the switch).
+	document.querySelector('.platform-switch')?.addEventListener('click', (e) => {
+		const tab = (e.target as HTMLElement).closest('.platform-tab') as HTMLElement | null;
+		if (!tab) return;
+		const p = tab.getAttribute('data-platform');
+		if (p === 'java' || p === 'bedrock') {
+			// Synthetic potion names are only valid Bedrock IDs; on Java fall
+			// back to the generic potion item (customisable via the potion section).
+			if (p === 'java' && potionItems.some((i) => i.name === state.itemId.replace(/^minecraft:/, ''))) {
+				state.itemId = 'minecraft:potion';
+				const itemIdInput = document.getElementById('itemIdInput') as HTMLInputElement | null;
+				if (itemIdInput) itemIdInput.value = state.itemId;
 			}
-		});
+			setPlatform(p as Platform);
+			applyPlatformUI();
+			renderSections();
+		}
 	});
 
 	// Target
@@ -795,16 +940,17 @@ async function initTool() {
 	}
 	document.getElementById('pickItemBtn')?.addEventListener('click', () => openPicker());
 
-	// Quick search
+	// Quick search (debounced; delegated row clicks wired once).
 	const quickSearch = document.getElementById('quickSearch') as HTMLInputElement | null;
 	if (quickSearch) {
-		quickSearch.addEventListener('input', () => runQuickSearch(quickSearch.value));
-		quickSearch.addEventListener('focus', () => runQuickSearch(quickSearch.value));
+		quickSearch.addEventListener('input', () => debouncedQuickSearch(quickSearch.value));
+		quickSearch.addEventListener('focus', () => debouncedQuickSearch(quickSearch.value));
 		quickSearch.addEventListener('blur', () => {
 			const list = document.getElementById('quickResults');
 			if (list) setTimeout(() => { list.style.display = 'none'; }, 150);
 		});
 	}
+	wireQuickResultsOnce();
 
 	// Count
 	const countInput = document.getElementById('countInput') as HTMLInputElement | null;
@@ -885,6 +1031,7 @@ async function loadItems() {
 		// they are real items whose data value the resolver handles.
 		allItems = data.filter((item) => item.id < 900000);
 		potionItems = data.filter((item) => item.id >= 900000);
+		rebuildItemIndex();
 		updateItemPreview();
 		renderOutput(); // refresh the big preview now that the item is known
 	} catch (err) {
