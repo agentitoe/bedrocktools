@@ -63,13 +63,47 @@ jobs:
               echo "Variables to enable Cloudflare Pages deploys."
               exit 0
             fi
-            bun x wrangler pages deploy public \
-              --project-name=bedrocktools \
+            bun x wrangler pages deploy public --project-name=bedrocktools
+
+  deploy-preview:
+    description: Deploy preview branch to Cloudflare Pages
+    executor: bun
+    steps:
+      - checkout
+      - install-bun
+      - run:
+          name: Install dependencies
+          command: bun install
+      - run:
+          name: Build
+          command: bun run build
+      - run:
+          name: Deploy Preview to Cloudflare Pages
+          command: |
+            if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+              echo "WARNING: skipping preview deploy - CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID"
+              echo "are not configured. Add them in Project Settings -> Environment"
+              echo "Variables to enable Cloudflare Pages deploys."
+              exit 0
+            fi
+            bun x wrangler pages deploy public --project-name=bedrocktools --branch=$CIRCLE_BRANCH
 workflows:
   version: 2
   build-and-deploy:
     jobs:
-      - test
+      - test:
+          filters:
+            branches:
+              only: /.*/
       - deploy:
           requires:
             - test
+          filters:
+            branches:
+              only: main
+      - deploy-preview:
+          requires:
+            - test
+          filters:
+            branches:
+              ignore: main
