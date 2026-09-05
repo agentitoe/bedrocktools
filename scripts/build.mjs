@@ -1,4 +1,4 @@
-import { readdirSync, statSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
+import { readdirSync, statSync, mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -184,6 +184,28 @@ async function syncOpenApi() {
 	}
 }
 
+/** swagger-ui-dist (npm) → public/api-docs/swagger/ (build determinista, salida estática). */
+function syncSwaggerUi() {
+	const pkgDir = join(root, "node_modules", "swagger-ui-dist");
+	const outSwaggerDir = join(publicDir, "api-docs", "swagger");
+	mkdirSync(outSwaggerDir, { recursive: true });
+	const files = [
+		"swagger-ui-bundle.js",
+		"swagger-ui-standalone-preset.js",
+		"swagger-ui.css",
+		"oauth2-redirect.html",
+	];
+	for (const file of files) {
+		const src = join(pkgDir, file);
+		if (!existsSync(src)) {
+			console.warn(`swagger-ui-dist: missing ${file}, skipping`);
+			continue;
+		}
+		copyFileSync(src, join(outSwaggerDir, file));
+	}
+	console.log("Synced swagger-ui-dist → public/api-docs/swagger/ (" + files.join(", ") + ")");
+}
+
 async function main() {
 	await buildSharedUi();
 
@@ -198,6 +220,7 @@ async function main() {
 	mkdirSync(publicDir, { recursive: true });
 	writeFileSync(join(publicDir, "tools-manifest.json"), JSON.stringify(manifests, null, 2));
 	await syncOpenApi();
+	syncSwaggerUi();
 	console.log("Build complete. Built " + toolNames.length + " tool(s).");
 }
 

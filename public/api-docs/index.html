@@ -3,248 +3,61 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Addon Converter API — BedrockTools Docs</title>
-  <meta name="description" content="Sube tu .mcaddon y te lo devolvemos listo para jugar con logros. / Upload your .mcaddon and get it back ready with achievements." />
-  <meta name="keywords" content="bedrocktools, addon converter, mcpack, mcaddon, logros, achievements" />
+  <title>BedrockTools API Docs</title>
+  <meta name="description" content="Documentación oficial de la API de BedrockTools (OpenAPI). Prueba los endpoints desde el navegador." />
   <link rel="canonical" href="https://bedrocktools.pages.dev/api-docs/" />
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
-  <link rel="stylesheet" href="/assets/styles.css" />
-  <link rel="stylesheet" href="./styles.css" />
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="Addon Converter API — BedrockTools" />
-  <meta property="og:description" content="Convierte tu pack y conserva los logros. Prueba la API desde el navegador. / Convert your pack, keep achievements. Try the API in your browser." />
-  <meta property="og:url" content="https://bedrocktools.pages.dev/api-docs/" />
-  <meta property="og:image" content="https://bedrocktools.pages.dev/assets/favicon.svg" />
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "TechArticle",
-    "headline": "Addon Converter API Docs",
-    "description": "Convierte tu pack y conserva los logros / Convert your pack, keep achievements",
-    "author": {"@type": "Organization","name": "BedrockTools"},
-    "url": "https://bedrocktools.pages.dev/api-docs/"
-  }
-  </script>
+  <link rel="stylesheet" href="./swagger/swagger-ui.css" />
+  <style>
+    body { margin: 0; background: #fafafa; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .bt-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #101418; color: #fff; }
+    .bt-header a { color: #fff; text-decoration: none; }
+    .bt-header a:hover { text-decoration: underline; }
+    .bt-brand { font-weight: 700; }
+    .bt-docs { opacity: .7; }
+    .bt-spacer { flex: 1; }
+    .bt-speclinks { display: flex; gap: 12px; font-size: 14px; opacity: .9; }
+    #swagger-ui { max-width: 1460px; margin: 0 auto; padding: 8px 16px 48px; }
+  </style>
 </head>
-<body class="docs-ref">
-  <div class="top-bar">
-    <button class="icon-btn lang-toggle" id="langToggle" title="Change language" aria-label="Change language">
-      <span class="noto-color-emoji-regular">🇪🇸</span><span class="label">ES</span>
-    </button>
-    <div class="lang-dropdown" id="langDropdown" role="menu"></div>
-    <button class="icon-btn theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Toggle theme"><span class="noto-color-emoji-regular">🌙</span></button>
-  </div>
-
-  <header class="ref-topbar">
-    <a class="ref-brand" href="/"><span class="ref-brand-mark">⛏</span><span>BedrockTools</span> <small data-i18n="brandDocs">API Docs</small></a>
-    <span class="ref-chip" id="ref-version">v1.0.0</span>
-    <label class="ref-serverwrap" for="ref-server"><span class="ref-server-label" data-i18n="serverLabel">Servidor:</span>
-      <select id="ref-server" aria-label="API server"></select>
-    </label>
-    <nav class="ref-speclinks" aria-label="Spec">
+<body>
+  <header class="bt-header">
+    <a class="bt-brand" href="/">⛏ BedrockTools</a>
+    <span class="bt-docs">API Docs</span>
+    <span class="bt-spacer"></span>
+    <nav class="bt-speclinks" aria-label="Spec">
       <a href="/openapi.json" target="_blank" rel="noopener">openapi.json</a>
-      <a class="ref-hide-sm" href="/openapi.yaml" target="_blank" rel="noopener">openapi.yaml</a>
+      <a href="/openapi.yaml" target="_blank" rel="noopener">openapi.yaml</a>
     </nav>
   </header>
 
-  <main class="human-wrap">
-    <nav class="ref-breadcrumb" aria-label="Breadcrumb">
-      <a href="/" data-i18n="crumbHome">Inicio</a><span class="sep">/</span>
-      <span data-i18n="crumbApi">API</span><span class="sep">/</span>
-      <span class="here">Addon Converter</span>
-    </nav>
-
-    <div class="ref-error" id="ref-error" role="alert"></div>
-    <div id="ref-skeleton" aria-hidden="true">
-      <div class="ref-skel"><span style="width:45%"></span><span></span><span style="width:80%"></span><span style="width:60%"></span></div>
-    </div>
-
-    <!-- Hero humano -->
-    <section class="hero">
-      <p class="hero-kicker" data-i18n="heroKicker">Gratis · Sin cuenta · Límite 30 MB</p>
-      <h1 data-i18n="heroTitle">Convierte tu pack y conserva los logros</h1>
-      <p class="hero-sub" data-i18n="heroSub">Sube tu .mcpack o .mcaddon y te lo devolvemos listo para jugar con logros en Xbox.</p>
-      <ol class="steps">
-        <li class="step">
-          <span class="step-n" aria-hidden="true">1</span>
-          <div><strong data-i18n="step1t">Sube</strong><p data-i18n="step1d">Elige tu archivo .mcpack, .mcaddon o .zip.</p></div>
-        </li>
-        <li class="step">
-          <span class="step-n" aria-hidden="true">2</span>
-          <div><strong data-i18n="step2t">Convertimos</strong><p data-i18n="step2d">Lo procesamos en el servidor, sin instalar nada.</p></div>
-        </li>
-        <li class="step">
-          <span class="step-n" aria-hidden="true">3</span>
-          <div><strong data-i18n="step3t">Descarga *_MODIFIED</strong><p data-i18n="step3d">Recibes tu pack listo como *_MODIFIED.mcaddon.</p></div>
-        </li>
-      </ol>
-    </section>
-
-    <!-- Try-it ARRIBA: solo multipart -->
-    <section class="try-card" id="ref-tryit" aria-label="Try it">
-      <h2><span data-i18n="tryTitle">Pruébalo aquí</span> <code class="try-path">POST /api/addon-converter</code></h2>
-      <span id="try-target" class="visually-hidden">POST /api/addon-converter</span>
-      <div class="try-main">
-        <label class="drop" for="try-file">
-          <span class="drop-cta" data-i18n="fileLabel">Archivo (.mcpack / .mcaddon / .zip)</span>
-          <input id="try-file" type="file" accept=".mcpack,.mcaddon,.zip,application/zip" />
-          <span class="ref-size" id="try-size"></span>
-        </label>
-        <button type="button" id="ref-try-send" data-i18n="sendBtn">Convertir</button>
-      </div>
-      <p class="ref-hint" data-i18n="tryHint">Límite 30 MB. Recibirás un archivo *_MODIFIED.mcaddon.</p>
-
-      <!-- compat oculta: el Try-it usa siempre multipart, estos campos solo existen para no romper selectores -->
-      <div hidden aria-hidden="true">
-        <div id="try-ct-wrap"><select id="try-ct"><option value="multipart/form-data">multipart/form-data</option></select></div>
-        <div id="try-name-wrap"><input id="try-filename" type="text" value="addon.mcaddon" /></div>
-        <div id="try-b64-wrap"><textarea id="try-base64"></textarea></div>
-      </div>
-
-      <div class="ref-panel" id="ref-responseViewer">
-        <h3 data-i18n="respTitle">Respuesta</h3>
-        <div class="ref-resp-meta">
-          <span class="ref-status-pill" id="ref-resp-status">—</span>
-          <span class="ref-ms" id="ref-resp-ms"></span>
-        </div>
-        <div class="ref-resp-headers" id="ref-resp-headers" style="display:none"></div>
-        <pre class="ref-sample" id="ref-resp-pre" style="display:none" tabindex="0"></pre>
-        <a class="ref-download" id="ref-resp-download" style="display:none">⬇</a>
-        <p class="ref-resp-empty" id="ref-resp-empty" data-i18n="respEmpty">Aún sin respuesta. Elige un archivo y pulsa Convertir.</p>
-      </div>
-    </section>
-
-    <!-- Ejemplos simples -->
-    <section class="samples-card" aria-label="Code samples">
-      <h2 data-i18n="codeTitle">Ejemplos de código</h2>
-      <div class="ref-urlbox">
-        <h3 data-i18n="urlTitle">Request URL</h3>
-        <div class="ref-url-line">
-          <span class="method-pill post" id="ref-urlbox-method">post</span>
-          <code id="ref-urlbox-code">…</code>
-          <button type="button" class="ref-copybtn" id="ref-urlbox-copy" data-i18n="copyBtn">Copiar</button>
-        </div>
-      </div>
-      <div class="ref-tabs" role="group" aria-label="Language" id="ref-code-tabs">
-        <button type="button" class="ref-tab" data-clang="curl" aria-pressed="true" tabindex="0">cURL</button>
-        <button type="button" class="ref-tab" data-clang="js" aria-pressed="false" tabindex="-1">JS</button>
-        <button type="button" class="ref-tab" data-clang="py" aria-pressed="false" tabindex="-1">Python</button>
-      </div>
-      <pre id="ref-code-pre" tabindex="0">// …</pre>
-      <div style="margin-top:10px; display:flex; justify-content:flex-end;">
-        <button type="button" class="ref-copybtn" id="ref-code-copy" data-i18n="copyBtn">Copiar</button>
-      </div>
-    </section>
-
-    <!-- Referencia humana generada del spec (POST + GET, sin OPTIONS ni schemas) -->
-    <section id="ref-endpoints" aria-live="polite"></section>
-
-    <!-- Avanzado colapsado -->
-    <details class="adv" id="ref-advanced-box">
-      <summary data-i18n="advTitle">Avanzado</summary>
-      <div class="adv-body">
-        <p class="ref-req-desc" data-i18n="advIntro">¿Eres un bot o necesitas más control? Tienes dos formas extra.</p>
-        <h3 data-i18n="advJsonT">JSON con base64 (para bots)</h3>
-        <p class="ref-req-desc" data-i18n="advJsonD">Envía { file: base64, filename } con Content-Type application/json.</p>
-        <pre class="ref-sample" id="ref-adv-json" tabindex="0"></pre>
-        <h3 data-i18n="advRawT">Binario directo + ?filename=</h3>
-        <p class="ref-req-desc" data-i18n="advRawD">Envía el ZIP tal cual con ?filename=miPack.mcaddon.</p>
-        <pre class="ref-sample" id="ref-adv-raw" tabindex="0"></pre>
-      </div>
-    </details>
-
-    <footer class="ref-footer">
-      <span data-i18n="footer">Docs generados desde OpenAPI 3.1 — fuente en <code>openapi.yaml / openapi.json</code></span>
-      · <a href="https://github.com/agentitoe/bedrocktools" target="_blank" rel="noopener">GitHub</a>
-    </footer>
-  </main>
-
-  <div id="ref-overlay" hidden></div>
+  <div id="swagger-ui"></div>
 
   <noscript>
-    <div style="max-width:720px;margin:80px auto;padding:24px;font-family:sans-serif;">
-      <h1>Addon Converter API</h1>
+    <div style="max-width:720px;margin:40px auto;padding:24px;font-family:sans-serif;">
+      <h1>BedrockTools API Docs</h1>
       <p>Esta documentación necesita JavaScript. Spec: <a href="/openapi.json">openapi.json</a> · <a href="/openapi.yaml">openapi.yaml</a></p>
       <pre>curl -F "file=@addon.mcaddon" https://bedrocktools.pages.dev/api/addon-converter --output addon_MODIFIED.mcaddon</pre>
     </div>
   </noscript>
 
-  <script type="module">
-    import { initUi } from '/assets/ui.js';
-    import { init as initDocs, setLang as setDocsLang } from './app.js';
-    const translations = {
-      es: {
-        brandDocs: 'API Docs',
-        serverLabel: 'Servidor:',
-        crumbHome: 'Inicio',
-        crumbApi: 'API',
-        heroKicker: 'Gratis · Sin cuenta · Límite 30 MB',
-        heroTitle: 'Convierte tu pack y conserva los logros',
-        heroSub: 'Sube tu .mcpack o .mcaddon y te lo devolvemos listo para jugar con logros en Xbox.',
-        step1t: 'Sube',
-        step1d: 'Elige tu archivo .mcpack, .mcaddon o .zip.',
-        step2t: 'Convertimos',
-        step2d: 'Lo procesamos en el servidor, sin instalar nada.',
-        step3t: 'Descarga *_MODIFIED',
-        step3d: 'Recibes tu pack listo como *_MODIFIED.mcaddon.',
-        tryTitle: 'Pruébalo aquí',
-        fileLabel: 'Archivo (.mcpack / .mcaddon / .zip)',
-        sendBtn: 'Convertir',
-        tryHint: 'Límite 30 MB. Recibirás un archivo *_MODIFIED.mcaddon.',
-        respTitle: 'Respuesta',
-        respEmpty: 'Aún sin respuesta. Elige un archivo y pulsa Convertir.',
-        codeTitle: 'Ejemplos de código',
-        urlTitle: 'Request URL',
-        copyBtn: 'Copiar',
-        advTitle: 'Avanzado',
-        advIntro: '¿Eres un bot o necesitas más control? Tienes dos formas extra.',
-        advJsonT: 'JSON con base64 (para bots)',
-        advJsonD: 'Envía { file: base64, filename } con Content-Type application/json.',
-        advRawT: 'Binario directo + ?filename=',
-        advRawD: 'Envía el ZIP tal cual con ?filename=miPack.mcaddon.',
-        footer: 'Docs generados desde OpenAPI 3.1 — fuente en <code>openapi.yaml / openapi.json</code>',
-        changeLanguageTitle: 'Cambiar idioma',
-        switchToLightTitle: 'Cambiar a tema claro',
-        switchToDarkTitle: 'Cambiar a tema oscuro',
-      },
-      en: {
-        brandDocs: 'API Docs',
-        serverLabel: 'Server:',
-        crumbHome: 'Home',
-        crumbApi: 'API',
-        heroKicker: 'Free · No signup · 30 MB limit',
-        heroTitle: 'Convert your pack, keep achievements',
-        heroSub: 'Upload your .mcpack or .mcaddon and get it back ready to play with achievements on Xbox.',
-        step1t: 'Upload',
-        step1d: 'Pick your .mcpack, .mcaddon or .zip file.',
-        step2t: 'We convert',
-        step2d: 'We process it on the server, nothing to install.',
-        step3t: 'Download *_MODIFIED',
-        step3d: 'You get your pack back as *_MODIFIED.mcaddon.',
-        tryTitle: 'Try it here',
-        fileLabel: 'File (.mcpack / .mcaddon / .zip)',
-        sendBtn: 'Convert',
-        tryHint: '30 MB limit. You will get a *_MODIFIED.mcaddon file.',
-        respTitle: 'Response',
-        respEmpty: 'No response yet. Pick a file and press Convert.',
-        codeTitle: 'Code samples',
-        urlTitle: 'Request URL',
-        copyBtn: 'Copy',
-        advTitle: 'Advanced',
-        advIntro: 'Are you a bot or need more control? You have two extra ways.',
-        advJsonT: 'JSON with base64 (for bots)',
-        advJsonD: 'Send { file: base64, filename } with Content-Type application/json.',
-        advRawT: 'Raw binary + ?filename=',
-        advRawD: 'Send the ZIP as-is with ?filename=myPack.mcaddon.',
-        footer: 'Docs generated from OpenAPI 3.1 — source at <code>openapi.yaml / openapi.json</code>',
-        changeLanguageTitle: 'Change language',
-        switchToLightTitle: 'Switch to light theme',
-        switchToDarkTitle: 'Switch to dark theme',
-      }
+  <script src="./swagger/swagger-ui-bundle.js"></script>
+  <script src="./swagger/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function () {
+      SwaggerUIBundle({
+        url: "/openapi.json",
+        dom_id: "#swagger-ui",
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "StandaloneLayout",
+        tryItOutEnabled: true,
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        docExpansion: "list",
+        defaultModelsExpandDepth: 1,
+        oauth2RedirectUrl: "./swagger/oauth2-redirect.html"
+      });
     };
-    const uiLang = initUi(translations, { onApplyLang: (lang) => setDocsLang(lang) });
-    setDocsLang(uiLang);
-    initDocs();
   </script>
 </body>
 </html>

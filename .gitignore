@@ -7,6 +7,7 @@ public/assets/ui.js
 package-lock.json
 .kilo/
 public/tools-manifest.json
+public/api-docs/swagger/
 bun.lock
 .test-dist
 .freebuff/
