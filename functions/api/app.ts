@@ -76,9 +76,12 @@ export function createApp() {
 			)
 			.use(
 				openapi({
-					path: "/api/docs",
+					// provider: null -> the plugin only serves the JSON spec; the
+					// Swagger UI page is served by our own route below so the spec
+					// URL is under our control (the plugin strips the leading slash
+					// from specPath, which Swagger resolves relative to /api/docs).
+					provider: null,
 					specPath: "/api/openapi/json",
-					provider: "swagger-ui",
 					documentation: {
 						info: {
 							title: "BedrockTools API",
@@ -115,6 +118,29 @@ export function createApp() {
 				() => ({ status: "ok", version: API_VERSION }),
 				{ detail: { tags: ["meta"], summary: "Health check" } }
 			)
+			.get("/api/docs", () => {
+				// Self-contained Swagger UI page. The spec URL is absolute on purpose:
+				// a relative URL would resolve against /api/docs and double the prefix.
+				const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>BedrockTools API</title>
+	<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@latest/swagger-ui.css" />
+</head>
+<body>
+	<div id="swagger-ui"></div>
+	<script src="https://unpkg.com/swagger-ui-dist@latest/swagger-ui-bundle.js" crossorigin></script>
+	<script>
+		window.onload = () => {
+			window.ui = SwaggerUIBundle({ "url": "/api/openapi/json", dom_id: "#swagger-ui" });
+		};
+	</script>
+</body>
+</html>`;
+				return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+			}, { detail: { tags: ["meta"], summary: "API documentation (Swagger UI)" } })
 
 			// ---- items ----
 			.get(

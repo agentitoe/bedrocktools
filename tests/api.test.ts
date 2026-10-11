@@ -303,4 +303,26 @@ describe("API endpoints (real public/ data via mock ASSETS)", () => {
 		expect(res.status).toBeLessThan(400);
 		expect(res.headers.get("access-control-allow-origin")).toBeTruthy();
 	});
+
+	test("Swagger UI references the absolute spec URL (no double /api prefix)", async () => {
+		const res = await app.handle(apiRequest("/api/docs"));
+		expect(res.status).toBe(200);
+		const html = await res.text();
+		// Regression: the plugin strips the leading slash of specPath, which
+		// Swagger resolves relative to /api/docs -> /api/api/openapi/json.
+		expect(html).toContain('"url": "/api/openapi/json"');
+		expect(html).not.toContain("api/api/openapi");
+	});
+
+	test("OpenAPI spec lists every route", async () => {
+		const { status, body } = await getJson(app, "/api/openapi/json");
+		expect(status).toBe(200);
+		const paths = Object.keys((body as { paths: Record<string, unknown> }).paths);
+		expect(paths).toContain("/api/health");
+		expect(paths).toContain("/api/items");
+		expect(paths).toContain("/api/items/{idOrName}");
+		expect(paths).toContain("/api/recipes");
+		expect(paths).toContain("/api/models/{name}");
+		expect(paths).toContain("/api/textures/*");
+	});
 });
