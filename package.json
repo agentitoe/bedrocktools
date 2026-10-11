@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun scripts/build.mjs && bun scripts/extract-data.mjs && bun scripts/translate-items.mjs",
+    "build": "bun scripts/build.mjs && bun scripts/extract-data.mjs && bun scripts/translate-items.mjs && bun scripts/fetch-geyser-mappings.mjs",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "dev": "bun run build && bun scripts/serve.mjs",

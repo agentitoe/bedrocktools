@@ -9,7 +9,7 @@ import { translations } from './translations';
 import { sectionsFor } from './options';
 import { resetValues, setPlatform, setValue, state } from './state';
 import { buildCommand } from './builder';
-import { bedrockPotionDataList, resolveBedrockItem } from './bedrock-ids';
+import { bedrockPotionDataList, loadBedrockItemMap, resolveBedrockItem } from './bedrock-ids';
 import type { BedrockPotionEntry } from './bedrock-ids';
 import { createImgTag } from './images';
 
@@ -867,12 +867,14 @@ async function initTool() {
 		renderOutput();
 	});
 
+	// Load items + Bedrock mappings before the first render: the Bedrock
+	// command preview resolves item names through the Geyser map.
+	await Promise.all([loadItems(), loadBedrockItemMap()]);
+
 	applyPlatformUI();
 	renderSections();
 	renderOutput();
 	updatePotionSelect();
-
-	await loadItems();
 }
 
 async function loadItems() {

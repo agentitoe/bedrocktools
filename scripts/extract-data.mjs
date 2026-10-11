@@ -14,16 +14,24 @@ const publicDir = join(root, 'public');
 const dataDir = join(publicDir, 'data');
 const texturesDir = join(publicDir, 'textures');
 
-// Use InventivetalentDev/minecraft-assets branch 26.1 for models and textures
-const ASSET_BASE = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/26.1/assets/minecraft';
+// Use InventivetalentDev/minecraft-assets branch 26.3 for models and textures.
+// The branch is the single source of truth: item catalog (items/_all.json),
+// block/item models, textures, vanilla recipe JSONs and item tags.
+// (minecraft-data's newest *published data* is 26.1, so it is only used below
+// as a fallback for display names and stack sizes, never as the catalog.)
+const MC_VERSION = '26.3';
+const ASSET_BASE = `https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/${MC_VERSION}/assets/minecraft`;
 const MODEL_BASE = `${ASSET_BASE}/models`;        // models/block, models/item
-const ITEMS_BASE = `${ASSET_BASE}/items`;         // new 26.1 item model definitions
+const ITEMS_BASE = `${ASSET_BASE}/items`;         // item model definitions (_all.json = full catalog)
 const BLOCKS_TEXTURE_BASE = `${ASSET_BASE}/textures/block`;
 const ITEMS_TEXTURE_BASE = `${ASSET_BASE}/textures/item`;
 const ENTITY_TEXTURE_BASE = `${ASSET_BASE}/textures/entity`;
-const DATA_BASE = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/26.1/data/minecraft';
+const DATA_BASE = `https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/${MC_VERSION}/data/minecraft`;
 const RECIPE_BASE = `${DATA_BASE}/recipe`;
 const ITEM_TAG_BASE = `${DATA_BASE}/tags/item`;
+// generatePotions() assigns synthetic potion ids starting here; vanilla item
+// ids must stay below this bound so the two spaces never collide.
+const POTION_ID_BASE = 900000;
 
 // Bun uses its own HTTP client with built-in pooling
 const FETCH_OPTS = { headers: { 'Accept': 'application/json, image/png' } };
@@ -438,38 +446,19 @@ function generatePotions(nameToId) {
 }
 
 /**
- * Extract every recipe type: crafting (shaped + shapeless) from minecraft-data,
- * plus smelting/blasting/smoking/campfire/stonecutting/smithing from the vanilla
- * recipe JSONs, plus hardcoded brewing recipes.
+ * Extract every recipe type from the vanilla recipe JSONs (26.3 assets):
+ * crafting (shaped + shapeless), smelting/blasting/smoking/campfire,
+ * stonecutting and smithing. Brewing recipes are merged in separately.
  * Returns { resultId: [recipe, ...] }.
  */
-async function extractAllRecipes(mcData) {
+async function extractAllRecipes(nameToId) {
 	const recipes = {};
-	const byName = mcData.itemsByName || {};
-	const nameToId = (n) => {
-		const it = byName[String(n).replace(/^minecraft:/, '')];
-		return it ? it.id : null;
-	};
 	const addRecipe = (resultId, recipe) => {
 		if (!resultId) return;
 		(recipes[resultId] = recipes[resultId] || []).push(recipe);
 	};
 
-	// 1. Crafting recipes (shaped + shapeless) from minecraft-data
-	for (const [key, list] of Object.entries(mcData.recipes || {})) {
-		const resultId = parseInt(key);
-		if (isNaN(resultId)) continue;
-		for (const r of list || []) {
-			if (!r || !r.result || r.result.id <= 0) continue;
-			if (r.inShape) {
-				addRecipe(resultId, { type: 'crafting_shaped', inShape: r.inShape, result: { id: r.result.id, count: r.result.count } });
-			} else if (r.ingredients) {
-				addRecipe(resultId, { type: 'crafting_shapeless', ingredients: r.ingredients, result: { id: r.result.id, count: r.result.count } });
-			}
-		}
-	}
-
-	// 2. Furnace-family, stonecutting and smithing recipes from vanilla JSONs.
+	// 1. Vanilla recipe JSONs (all types).
 	const tagCache = new Map();
 	async function resolveIngredient(ing) {
 		if (Array.isArray(ing)) {
@@ -540,15 +529,38 @@ async function extractAllRecipes(mcData) {
 					addition: addition == null ? null : addition,
 					result: { id: resultId, count: r.result.count || 1 }
 				});
+			} else if (type === 'crafting_shaped') {
+				const key = r.key || {};
+				const keyIds = {};
+				for (const [ch, ing] of Object.entries(key)) keyIds[ch] = await resolveIngredient(ing);
+				const inShape = (Array.isArray(r.pattern) ? r.pattern : []).map((row) =>
+					String(row).split('').map((ch) => (ch === ' ' ? null : (keyIds[ch] ?? null)))
+				);
+				if (inShape.length > 0) {
+					addRecipe(resultId, {
+						type: 'crafting_shaped',
+						inShape,
+						result: { id: resultId, count: r.result.count || 1 }
+					});
+				}
+			} else if (type === 'crafting_shapeless') {
+				const ingredients = [];
+				for (const ing of r.ingredients || []) ingredients.push(await resolveIngredient(ing));
+				if (ingredients.length > 0) {
+					addRecipe(resultId, {
+						type: 'crafting_shapeless',
+						ingredients,
+						result: { id: resultId, count: r.result.count || 1 }
+					});
+				}
 			}
-			// crafting_shaped / crafting_shapeless are skipped here (already covered
-			// by minecraft-data), as are other specialised types.
+			// Other specialised types (decorated pot, transmute, ...) are skipped.
 		}
 	};
 	const workers = new Array(Math.min(40, files.length)).fill(null).map(() => worker());
 	await Promise.all(workers);
 
-	// 3. Brewing recipes are generated separately by generatePotions() and merged
+	// 2. Brewing recipes are generated separately by generatePotions() and merged
 	// in extractData (every potion variant is its own item).
 
 	return recipes;
@@ -1020,50 +1032,96 @@ async function downloadTextures(tasks) {
 	console.log(`Downloaded ${downloaded}/${unique.length} textures`);
 }
 
+/**
+ * Write a data file atomically: remove any previous file first (Windows
+ * truncation quirks left stale tails when overwriting longer files with
+ * shorter content) and verify the written bytes parse back.
+ */
+function writeJsonFile(path, data) {
+	const json = JSON.stringify(data);
+	if (existsSync(path)) unlinkSync(path);
+	writeFileSync(path, json);
+	try {
+		JSON.parse(readFileSync(path, 'utf8'));
+	} catch (error) {
+		throw new Error(`Corrupt write detected for ${path}: ${error.message}`);
+	}
+}
+
 async function extractData() {
 	console.time('extractData');
 
-	// Use Java 26.1 - matches texture version
-	let mcData = minecraftData('26.1');
-	if (!mcData) throw new Error('Could not load Minecraft data for 26.1');
+	// Catalog source of truth: the 26.3 assets repo. items/_all.json lists every
+	// item with its model dispatch; an item is a "block item" when its resolved
+	// model path lives under minecraft:block/.
+	// minecraft-data (only published up to 26.1) is used solely as a fallback
+	// for display names and stack sizes by name.
+	const labelData = minecraftData('26.1');
+	if (!labelData) throw new Error('Could not load minecraft-data 26.1 for display names/stack sizes');
 
-	const blockNames = new Set(
-		(mcData.blocksArray || []).map((b) => b.name).filter((n) => n && n !== 'air')
-	);
+	const itemDispatch = await fetchJson(`${ITEMS_BASE}/_all.json`);
+	if (!itemDispatch) throw new Error(`Could not load item catalog from ${ITEMS_BASE}/_all.json`);
 
-	const allItems = (mcData.itemsArray || [])
-		.map((item) => {
-			const isBlockItem = blockNames.has(item.name);
-			const cleanName = item.name.replace('minecraft:', '');
-			const textureUrl = isBlockItem
-				? `${BLOCKS_TEXTURE_BASE}/${cleanName}.png`
-				: `${ITEMS_TEXTURE_BASE}/${cleanName}.png`;
-			return {
-				id: item.id,
-				name: item.name,
-				displayName: item.displayName,
-				stackSize: item.stackSize || 64,
-				textureUrl
-			};
-		})
-		.filter((item) => item.id > 0 && item.name !== 'air');
+	// Keep existing numeric ids stable (recipes.json keys and client code
+	// reference them); new 26.3 items get ids appended after the current max.
+	const existingIds = new Map();
+	try {
+		const prev = JSON.parse(readFileSync(join(dataDir, 'items.json'), 'utf8'));
+		for (const item of prev) {
+			if (item && typeof item.name === 'string' && Number.isFinite(item.id)) {
+				existingIds.set(item.name.replace(/^minecraft:/, ''), item.id);
+			}
+		}
+	} catch {
+		// No previous extraction: every id is assigned from scratch.
+	}
+	let nextId = Math.max(0, ...[...existingIds.values()].filter((id) => id < POTION_ID_BASE)) + 1;
 
-	const blockItemIds = new Set(allItems.filter((item) => blockNames.has(item.name)).map((item) => item.id));
+	// `air` is not an item; the assets catalog still lists it.
+	const catalog = new Map(); // name -> { id, blockItem }
+	for (const [name, dispatch] of Object.entries(itemDispatch)) {
+		if (!name || name.startsWith('_') || name === 'air') continue;
+		const modelPath = resolveItemModelRef(dispatch?.model);
+		const blockItem = modelPath?.startsWith('minecraft:block/') ?? false;
+		const id = existingIds.get(name) ?? nextId++;
+		catalog.set(name, { id, blockItem });
+	}
+
+	const displayNameOf = (name) =>
+		labelData.itemsByName?.[name]?.displayName ??
+		name.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+	const allItems = [...catalog.entries()]
+		.map(([name, meta]) => ({
+			id: meta.id,
+			// Bare item name (no "minecraft:" prefix) — the format every
+			// consumer of items.json expects (recipes, bedrock-ids, the API).
+			name,
+			displayName: displayNameOf(name),
+			stackSize: labelData.itemsByName?.[name]?.stackSize || 64,
+			textureUrl: meta.blockItem
+				? `${BLOCKS_TEXTURE_BASE}/${name}.png`
+				: `${ITEMS_TEXTURE_BASE}/${name}.png`
+		}))
+		.sort((a, b) => a.id - b.id);
+
+	const blockItemIds = new Set([...catalog.values()].filter((m) => m.blockItem).map((m) => m.id));
 
 	// Generate every potion as its own item (normal/splash/lingering × I/II/
 	// extended) with a full brewing step chain each. The generic potion carriers
 	// (potion / splash_potion / lingering_potion) are removed so brewing no longer
 	// shows up as recipes of a single "potion" item.
 	const nameToId = (n) => {
-		const it = mcData.itemsByName[String(n).replace(/^minecraft:/, '')];
-		return it ? it.id : null;
+		const meta = catalog.get(String(n).replace(/^minecraft:/, ''));
+		return meta ? meta.id : null;
 	};
 	const genericPotionNames = new Set(['potion', 'splash_potion', 'lingering_potion']);
 	const vanillaItems = allItems.filter((item) => !genericPotionNames.has(item.name.replace('minecraft:', '')));
 	const potionGen = generatePotions(nameToId);
 
-	// Extract recipes (crafting + smelting/blasting/smoking/campfire/stonecutting/smithing)
-	const recipes = await extractAllRecipes(mcData);
+	// Extract recipes (crafting shaped/shapeless + smelting/blasting/smoking/
+	// campfire/stonecutting/smithing) from the vanilla recipe JSONs.
+	const recipes = await extractAllRecipes(nameToId);
 	for (const [id, list] of Object.entries(potionGen.recipes)) {
 		(recipes[id] = recipes[id] || []).push(...list);
 	}
@@ -1213,7 +1271,7 @@ async function extractData() {
 			if (!f.endsWith('.json')) continue;
 			allModels[f.slice(0, -5)] = JSON.parse(readFileSync(join(blockModelsDir, f), 'utf8'));
 		}
-		writeFileSync(join(dataDir, 'models', 'all.json'), JSON.stringify(allModels));
+		writeJsonFile(join(dataDir, 'models', 'all.json'), allModels);
 		console.log(`Combined ${Object.keys(allModels).length} block models into all.json`);
 	}
 
@@ -1261,21 +1319,21 @@ async function extractData() {
 	// Append the generated potion items (already carry their textureUrl/layers).
 	itemsWithData.push(...potionGen.items);
 
-	const allBlocks = (mcData.blocksArray || [])
+	const allBlocks = vanillaItems
+		.filter((item) => blockItemIds.has(item.id))
 		.map((block) => ({
 			id: block.id,
 			name: block.name,
-			displayName: block.displayName || block.name,
+			displayName: block.displayName,
 			stackSize: 64,
 			textureUrl: `/textures/block/${block.name.replace('minecraft:', '')}.webp`
-		}))
-		.filter((block) => block.id > 0 && block.name !== 'air');
+		}));
 
 	mkdirSync(dataDir, { recursive: true });
-	writeFileSync(join(dataDir, 'items.json'), JSON.stringify(itemsWithData));
-	writeFileSync(join(dataDir, 'blocks.json'), JSON.stringify(allBlocks));
-	writeFileSync(join(dataDir, 'recipes.json'), JSON.stringify(recipes));
-	writeFileSync(join(dataDir, 'block-item-ids.json'), JSON.stringify([...blockItemIds]));
+	writeJsonFile(join(dataDir, 'items.json'), itemsWithData);
+	writeJsonFile(join(dataDir, 'blocks.json'), allBlocks);
+	writeJsonFile(join(dataDir, 'recipes.json'), recipes);
+	writeJsonFile(join(dataDir, 'block-item-ids.json'), [...blockItemIds]);
 
 	console.log(`Extracted ${itemsWithData.length} items (${blockItemIds.size} block items, ${itemsWithData.length - blockItemIds.size} pure items)`);
 	console.log(`Extracted ${allBlocks.length} blocks`);
