@@ -10,3 +10,4 @@ public/tools-manifest.json
 bun.lock
 .test-dist
 .freebuff/
+.opencode/

@@ -8,15 +8,20 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "dev": "bun run build && bun scripts/serve.mjs",
+    "dev:functions": "wrangler pages dev public --port 8787",
     "deploy": "wrangler pages deploy public"
   },
   "dependencies": {
+    "@elysiajs/cors": "^1.4.2",
+    "@elysiajs/openapi": "^1.4.16",
+    "elysia": "^1.4.30",
     "fflate": "^0.8.1",
     "minecraft-data": "^3.112.0",
     "sharp": "^0.35.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261011.1",
     "typescript": "^7.0.2",
-    "wrangler": "^4.35.0"
+    "wrangler": "^4.149.0"
   }
 }
