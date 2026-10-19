@@ -219,7 +219,7 @@ function landingHtml(): string {
 				<p class="hint">${l.openHint}</p>
 				<div class="drop-zone" id="aeDropZone" role="button" tabindex="0" aria-label="${escapeHtml(l.openTitle)}">
 					<div class="drop-prompt">
-						<span class="drop-icon">📦</span>
+						<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-folder"/></svg>
 						<p class="drop-main">${l.dropPrompt}</p>
 						<p class="drop-sub">${escapeHtml(l.dropSub)}</p>
 					</div>
@@ -237,7 +237,7 @@ function editorShellHtml(): string {
 		<div class="ae-shell">
 			<div class="ae-topbar">
 				<div class="ae-title">
-					<span class="ae-title-icon">🧩</span>
+					<span class="ae-title-icon"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-file-code"/></svg></span>
 					<span class="ae-title-name" title="${escapeHtml(projectName)}">${escapeHtml(projectName)}</span>
 				</div>
 				<div class="ae-actions">
@@ -278,17 +278,17 @@ function renderTree() {
 
 	if (currentDir !== '') {
 		rows.push(
-			`<div class="ae-row ae-row-up"><button type="button" class="ae-entry" data-ae-act="${register('navUp', '')}">⬅️ ${escapeHtml(t().upFolder)}</button></div>`
+			`<div class="ae-row ae-row-up"><button type="button" class="ae-entry" data-ae-act="${register('navUp', '')}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-arrow-left"/></svg> ${escapeHtml(t().upFolder)}</button></div>`
 		);
 	}
 
 	for (const name of folders) {
 		const path = joinPath(currentDir, name) + '/';
 		rows.push(
-			`<div class="ae-row ae-row-folder"><button type="button" class="ae-entry" data-ae-act="${register('openFolder', path)}">📁 ${escapeHtml(name)}</button>
+			`<div class="ae-row ae-row-folder"><button type="button" class="ae-entry" data-ae-act="${register('openFolder', path)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-folder"/></svg> ${escapeHtml(name)}</button>
 				<div class="ae-row-actions">
-					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-ae-act="${register('renameFolder', path)}">✏️</button>
-					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-ae-act="${register('deleteFolder', path)}">🗑️</button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-ae-act="${register('renameFolder', path)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-pencil"/></svg></button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-ae-act="${register('deleteFolder', path)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-trash"/></svg></button>
 				</div>
 			</div>`
 		);
@@ -297,12 +297,12 @@ function renderTree() {
 	for (const name of fileNames) {
 		const path = joinPath(currentDir, name);
 		const active = path === openPath ? ' ae-active' : '';
-		const icon = isBinary(path, files[path]) ? '🖼️' : '📄';
+		const icon = isBinary(path, files[path]) ? '<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-image"/></svg>' : '<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-file"/></svg>';
 		rows.push(
 			`<div class="ae-row ae-row-file${active}"><button type="button" class="ae-entry" data-ae-act="${register('openFile', path)}">${icon} ${escapeHtml(name)}</button>
 				<div class="ae-row-actions">
-					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-ae-act="${register('renameFile', path)}">✏️</button>
-					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-ae-act="${register('deleteFile', path)}">🗑️</button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().rename)}" data-ae-act="${register('renameFile', path)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-pencil"/></svg></button>
+					<button type="button" class="ae-mini" title="${escapeHtml(t().delete)}" data-ae-act="${register('deleteFile', path)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-trash"/></svg></button>
 				</div>
 			</div>`
 		);
@@ -317,7 +317,7 @@ function renderTree() {
 function buildBreadcrumb(): string {
 	const parts = currentDir ? currentDir.slice(0, -1).split('/') : [];
 	let acc = '';
-	let html = `<button type="button" class="ae-crumb" data-ae-nav="${register('navTo', '')}" title="${escapeHtml(t().rootLabel)}">🏠</button>`;
+	let html = `<button type="button" class="ae-crumb" data-ae-nav="${register('navTo', '')}" title="${escapeHtml(t().rootLabel)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-home"/></svg></button>`;
 	for (const p of parts) {
 		acc = acc ? acc + '/' + p : p;
 		html += `<span class="ae-crumb-sep">/</span><button type="button" class="ae-crumb" data-ae-nav="${register('navTo', acc + '/')}">${escapeHtml(p)}</button>`;
@@ -337,15 +337,15 @@ function renderFileHead() {
 	const docsUrl = docsUrlForPath(openPath);
 	el.innerHTML = `
 		<div class="ae-filehead-left">
-			<div class="ae-filehead-path" title="${escapeHtml(openPath)}">${bin ? '🖼️' : '📄'} ${escapeHtml(openPath)}</div>
+			<div class="ae-filehead-path" title="${escapeHtml(openPath)}">${bin ? '<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-image"/></svg>' : '<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-file"/></svg>'} ${escapeHtml(openPath)}</div>
 			<div class="ae-filehead-meta">${escapeHtml(formatSize(data.length))}${bin ? ' · ' + escapeHtml(t().binary) : ''}</div>
 		</div>
 		<span class="ae-status" id="aeStatus"></span>
 		<div class="ae-filehead-actions">
 			${bin ? '' : `<button type="button" class="btn btn-primary ae-save" id="aeSave">${escapeHtml(t().save)}</button>`}
-			<button type="button" class="btn btn-ghost ae-mini-btn" id="aeRename" title="${escapeHtml(t().rename)}">✏️</button>
-			<button type="button" class="btn btn-ghost ae-mini-btn" id="aeDelete" title="${escapeHtml(t().delete)}">🗑️</button>
-			${docsUrl ? `<button type="button" class="btn btn-ghost ae-mini-btn ae-docs-btn" id="aeDocs" title="${escapeHtml(t().docsHelpTitle)}">📖</button>` : ''}
+			<button type="button" class="btn btn-ghost ae-mini-btn" id="aeRename" title="${escapeHtml(t().rename)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-pencil"/></svg></button>
+			<button type="button" class="btn btn-ghost ae-mini-btn" id="aeDelete" title="${escapeHtml(t().delete)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-trash"/></svg></button>
+			${docsUrl ? `<button type="button" class="btn btn-ghost ae-mini-btn ae-docs-btn" id="aeDocs" title="${escapeHtml(t().docsHelpTitle)}"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-external"/></svg></button>` : ''}
 		</div>
 	`;
 	wireFileHead();
@@ -561,7 +561,7 @@ async function remountEditor() {
 	}
 	if (isBinary(openPath, data)) {
 		destroyEditor();
-		mount.innerHTML = `<div class="ae-editor-empty">🖼️ ${escapeHtml(t().binaryHint)}<br><span class="ae-muted">${escapeHtml(formatSize(data.length))}</span></div>`;
+		mount.innerHTML = `<div class="ae-editor-empty"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-image"/></svg> ${escapeHtml(t().binaryHint)}<br><span class="ae-muted">${escapeHtml(formatSize(data.length))}</span></div>`;
 		return;
 	}
 

@@ -77,10 +77,33 @@ bun scripts/build.mjs && bun scripts/serve.mjs
 ### What `bun run build` does
 
 1. **`scripts/build.mjs`** — bundles each tool into `public/tools/<slug>/bundle.js`, compiles `src/shared/ui.ts` into `public/assets/ui.js`, and writes `public/tools-manifest.json`.
-2. **`scripts/extract-data.mjs`** — downloads Minecraft 26.1 models, textures and recipes from GitHub and writes `public/data/*.json` + `public/textures/*.webp`.
-3. **`scripts/translate-items.mjs`** — stamps the Spanish `displayNameEs` onto `public/data/items.json`.
+2. **`scripts/fetch-fonts.mjs`** — downloads the Outfit + JetBrains Mono subsets (latin + latin-ext) into `public/fonts/`.
+3. **`scripts/extract-data.mjs`** — downloads Minecraft 26.1 models, textures and recipes from GitHub and writes `public/data/*.json` + `public/textures/*.webp`.
+4. **`scripts/translate-items.mjs`** — stamps the Spanish `displayNameEs` onto `public/data/items.json`.
+5. **`scripts/fetch-geyser-mappings.mjs`** — refreshes the Java↔Bedrock id map.
 
 `public/data/`, `public/textures/` and `public/fonts/` live in git, so a clean clone runs out of the box. The bundles and the manifest are git-ignored and rebuilt on demand.
+
+### Design system
+
+All visual rules live in **`public/assets/styles.css`**: the palette, radii, shadows, type scale, the top bar, buttons, cards, drop zone, status states, the home hero/sections/bento and the footer. A tool stylesheet must only add what is unique to that tool — never redefine the shared components.
+
+- **Type:** Outfit (UI + display), JetBrains Mono (code/ids), Press Start 2P (brand accents only — the hero wordmark and the footer mark).
+- **Colour:** grass green is the single accent; gold is reserved for small "attention" states. Every grey shares one cool hue, and shadows are tinted with the background hue instead of pure black.
+- **Icons:** `public/assets/icons.svg` holds the whole icon set as `<symbol>`s. Reference them with `<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-name"/></svg>` from markup and JS. Never use emoji for UI chrome.
+- **New shared component?** Add it to the shared stylesheet, use the tokens, and keep the z-index scale (`--z-drawer` / `--z-overlay` / `--z-toast`) intact.
+
+### 404 page
+
+`public/404.html` is served by Cloudflare Pages for unknown paths. It is hand-written HTML (no script bundle), so its copy lives inline in the file.
+
+### Social image
+
+`public/assets/og.png` is the source for the `og:image` / `twitter:image` tags. It is rendered from `public/assets/og.html` with plain headless Chrome (no browser-automation session involved; set `CHROME_BIN` if Chrome is not on the default paths):
+
+```bash
+bun run build:og
+```
 
 ## Layout
 

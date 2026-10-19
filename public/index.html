@@ -1,311 +1,297 @@
 <!doctype html>
 <html lang="es">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta
-            name="description"
-            content="Bedrock Tools: free tools for the Minecraft Bedrock ecosystem. Convert addons, organize .mcpack, .mcaddon and .mcworld packs for Xbox, calculate Nether coordinates and browse every item."
-        />
-        <meta
-            name="keywords"
-            content="minecraft bedrock, addon converter, pack organizer, mcpack, mcaddon, mcworld, xbox, bedrock tools, coordenadas nether"
-        />
-        <meta name="author" content="Bedrock Tools" />
-        <link rel="canonical" href="https://bedrocktools.pages.dev/" />
-        <link
-            rel="alternate"
-            hreflang="es"
-            href="https://bedrocktools.pages.dev/"
-        />
-        <link
-            rel="alternate"
-            hreflang="en"
-            href="https://bedrocktools.pages.dev/"
-        />
-        <link
-            rel="alternate"
-            hreflang="x-default"
-            href="https://bedrocktools.pages.dev/"
-        />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="Bedrock Tools" />
-        <meta
-            property="og:description"
-            content="Free tools for the Minecraft Bedrock ecosystem. Unlock achievements for addons, organize packs for Xbox and much more."
-        />
-        <meta property="og:url" content="https://bedrocktools.pages.dev/" />
-        <meta property="og:site_name" content="Bedrock Tools" />
-        <meta
-            property="og:image"
-            content="https://bedrocktools.pages.dev/assets/favicon.svg"
-        />
-        <meta property="og:locale" content="es_ES" />
-        <meta property="og:locale:alternate" content="en_US" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Bedrock Tools" />
-        <meta
-            name="twitter:description"
-            content="Free tools for the Minecraft Bedrock ecosystem."
-        />
-        <meta
-            name="twitter:image"
-            content="https://bedrocktools.pages.dev/assets/favicon.svg"
-        />
-        <title data-i18n="title">Bedrock Tools</title>
-        <link rel="icon" type="image/webp" href="/assets/favicon.svg" />
-        <link rel="apple-touch-icon" href="/assets/favicon.svg" />
-        <link rel="stylesheet" href="assets/styles.css" />
-        <script type="application/ld+json">
-            {
-                "@context": "https://schema.org",
-                "@type": "WebSite",
-                "name": "Bedrock Tools",
-                "url": "https://bedrocktools.pages.dev/",
-                "description": "Free tools for the Minecraft Bedrock ecosystem.",
-                "inLanguage": "en",
-                "potentialAction": {
-                    "@type": "SearchAction",
-                    "target": "https://bedrocktools.pages.dev/?q={search_term_string}",
-                    "query-input": "required name=search_term_string"
-                }
-            }
-        </script>
-    </head>
-    <body class="home">
-        <div class="top-bar">
-            <button
-                class="icon-btn lang-toggle"
-                id="langToggle"
-                title="Change language"
-                aria-label="Change language"
-            >
-                <span class="noto-color-emoji-regular">🇪🇸</span>
-                <span class="label">ES</span>
-            </button>
-            <div class="lang-dropdown" id="langDropdown" role="menu"></div>
-            <button
-                class="icon-btn theme-toggle"
-                id="themeToggle"
-                title="Cambiar tema"
-                aria-label="Toggle theme"
-            >
-                <span class="noto-color-emoji-regular">🌙</span>
-            </button>
-        </div>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta
+			name="description"
+			content="Bedrock Tools: herramientas gratuitas para Minecraft Java y Bedrock. Convierte addons, organiza packs para Xbox, calcula coordenadas del Nether, explora los 1.769 objetos del juego y crea recetas."
+		/>
+		<meta
+			name="keywords"
+			content="minecraft bedrock, minecraft java, addon converter, pack organizer, mcpack, mcaddon, mcworld, xbox, coordenadas nether, recetas, give, bedrock tools"
+		/>
+		<meta name="author" content="Bedrock Tools" />
+		<meta name="theme-color" content="#54b932" media="(prefers-color-scheme: light)" />
+		<meta name="theme-color" content="#10150f" media="(prefers-color-scheme: dark)" />
+		<link rel="canonical" href="https://bedrocktools.pages.dev/" />
+		<link rel="alternate" hreflang="es" href="https://bedrocktools.pages.dev/" />
+		<link rel="alternate" hreflang="en" href="https://bedrocktools.pages.dev/" />
+		<link rel="alternate" hreflang="x-default" href="https://bedrocktools.pages.dev/" />
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="Bedrock Tools" />
+		<meta
+			property="og:description"
+			content="Herramientas gratuitas para Minecraft Java y Bedrock que corren en tu navegador. Sin cuentas, sin subidas, sin límites."
+		/>
+		<meta property="og:url" content="https://bedrocktools.pages.dev/" />
+		<meta property="og:site_name" content="Bedrock Tools" />
+		<meta property="og:image" content="https://bedrocktools.pages.dev/assets/og.png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:locale" content="es_ES" />
+		<meta property="og:locale:alternate" content="en_US" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Bedrock Tools" />
+		<meta
+			name="twitter:description"
+			content="Herramientas gratuitas para Minecraft Java y Bedrock, en tu navegador."
+		/>
+		<meta name="twitter:image" content="https://bedrocktools.pages.dev/assets/og.png" />
+		<title data-i18n="title">Bedrock Tools — Herramientas para Minecraft</title>
+		<link rel="icon" type="image/webp" href="/assets/favicon.svg" />
+		<link rel="apple-touch-icon" href="/assets/favicon.svg" />
+		<link rel="preload" as="font" type="font/woff2" href="/fonts/outfit-latin.woff2" crossorigin />
+		<link rel="stylesheet" href="assets/styles.css" />
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "WebSite",
+				"name": "Bedrock Tools",
+				"url": "https://bedrocktools.pages.dev/",
+				"description": "Free tools for the Minecraft Java and Bedrock ecosystems.",
+				"inLanguage": ["es", "en"],
+				"potentialAction": {
+					"@type": "SearchAction",
+					"target": "https://bedrocktools.pages.dev/?q={search_term_string}",
+					"query-input": "required name=search_term_string"
+				}
+			}
+		</script>
+	</head>
+	<body class="home">
+		<a class="skip-link" href="#main" data-i18n="skipToContent">Saltar al contenido</a>
 
-        <header class="hero">
-            <div class="hero-scene" aria-hidden="true">
-                <div
-                    class="mc-cube cube-grass"
-                    style="--x: 6%; --y: 16%; --size: 96px; --delay: 0s"
-                ></div>
-                <div
-                    class="mc-cube cube-diamond"
-                    style="--x: 88%; --y: 12%; --size: 64px; --delay: -2.2s"
-                ></div>
-                <div
-                    class="mc-cube cube-tnt"
-                    style="--x: 9%; --y: 72%; --size: 60px; --delay: -4.1s"
-                ></div>
-                <div
-                    class="mc-cube cube-grass"
-                    style="--x: 84%; --y: 74%; --size: 72px; --delay: -1.4s"
-                ></div>
-                <div
-                    class="mc-cube cube-diamond"
-                    style="--x: 74%; --y: 8%; --size: 44px; --delay: -3.3s"
-                ></div>
-            </div>
-            <div class="container hero-content">
-                <span class="hero-badge"
-                    ><span class="noto-color-emoji-regular">⛏️</span>
-                    <span data-i18n="heroBadge"
-                        >Herramientas para Minecraft Bedrock</span
-                    ></span
-                >
-                <h1 class="hero-title">
-                    <span class="hero-title-line">BEDROCK</span>
-                    <span class="hero-title-line gradient-text">TOOLS</span>
-                </h1>
-                <p class="subtitle" data-i18n="tagline">
-                    Explora y usa nuestras herramientas para el ecosistema
-                    Minecraft Bedrock.
-                </p>
-                <div class="hero-cta">
-                    <a
-                        class="btn btn-primary"
-                        href="#tools"
-                        data-i18n="heroCtaPrimary"
-                        >Explorar herramientas</a
-                    >
-                    <a
-                        class="btn btn-ghost"
-                        href="/tools/minecraft-items"
-                        data-i18n="heroCtaSecondary"
-                        >Ver items y bloques</a
-                    >
-                </div>
-                <div class="hero-stats">
-                    <div class="stat">
-                        <span class="stat-num" data-count="7">0</span
-                        ><span class="stat-label" data-i18n="statTools"
-                            >Herramientas</span
-                        >
-                    </div>
-                    <div class="stat">
-                        <span class="stat-num" data-count="100" data-suffix="%"
-                            >0</span
-                        ><span class="stat-label" data-i18n="statFree"
-                            >Gratis</span
-                        >
-                    </div>
-                    <div class="stat">
-                        <span class="stat-num" data-count="2">0</span
-                        ><span class="stat-label" data-i18n="statLanguages"
-                            >Idiomas</span
-                        >
-                    </div>
-                    <div class="stat">
-                        <span class="stat-num">∞</span
-                        ><span class="stat-label" data-i18n="statLimits"
-                            >Sin límites</span
-                        >
-                    </div>
-                </div>
-            </div>
-        </header>
+		<div class="top-bar">
+			<button
+				class="icon-btn lang-toggle"
+				id="langToggle"
+				title="Cambiar idioma"
+				aria-label="Cambiar idioma"
+			></button>
+			<div class="lang-dropdown" id="langDropdown" role="menu"></div>
+			<button
+				class="icon-btn theme-toggle"
+				id="themeToggle"
+				title="Cambiar tema"
+				aria-label="Cambiar tema"
+			></button>
+		</div>
 
-        <main>
-            <section class="section" id="tools">
-                <div class="container">
-                    <div class="section-head reveal">
-                        <span class="section-eyebrow" data-i18n="toolsEyebrow"
-                            >Herramientas</span
-                        >
-                        <h2 class="section-title" data-i18n="toolsTitle">
-                            Elige tu herramienta
-                        </h2>
-                        <p class="section-sub" data-i18n="toolsSubtitle">
-                            Todo lo que necesitas para Minecraft, en Java y
-                            Bedrock.
-                        </p>
-                    </div>
-                    <div class="tools-group">
-                        <h3 class="tools-group-title" data-i18n="groupBoth">
-                            Java y Bedrock
-                        </h3>
-                        <div class="tools-grid" id="toolsGridBoth"></div>
-                    </div>
-                    <div class="tools-group">
-                        <h3 class="tools-group-title" data-i18n="groupBedrock">
-                            Solo Bedrock
-                        </h3>
-                        <div class="tools-grid" id="toolsGridBedrock"></div>
-                    </div>
-                </div>
-            </section>
+		<header class="hero">
+			<div class="hero-scene" aria-hidden="true">
+				<img
+					class="hero-item"
+					src="/textures/item/diamond_sword.webp"
+					alt=""
+					width="92"
+					height="92"
+					style="--x: 58%; --y: 8%; --size: 92px; --delay: 0s"
+				/>
+				<img
+					class="hero-item"
+					src="/textures/item/golden_apple.webp"
+					alt=""
+					width="64"
+					height="64"
+					style="--x: 79%; --y: 14%; --size: 64px; --delay: -1.6s"
+				/>
+				<img
+					class="hero-item"
+					src="/textures/item/totem_of_undying.webp"
+					alt=""
+					width="60"
+					height="60"
+					style="--x: 76%; --y: 62%; --size: 60px; --delay: -3.4s"
+				/>
+				<img
+					class="hero-item"
+					src="/textures/item/netherite_ingot.webp"
+					alt=""
+					width="48"
+					height="48"
+					style="--x: 17%; --y: 68%; --size: 48px; --delay: -5.1s"
+				/>
+				<img
+					class="hero-item"
+					src="/textures/item/ender_pearl.webp"
+					alt=""
+					width="44"
+					height="44"
+					style="--x: 93%; --y: 44%; --size: 44px; --delay: -2.2s"
+				/>
+			</div>
 
-            <section class="section features-section">
-                <div class="container">
-                    <div class="section-head reveal">
-                        <span
-                            class="section-eyebrow"
-                            data-i18n="featuresEyebrow"
-                            >¿Por qué Bedrock Tools?</span
-                        >
-                        <h2 class="section-title" data-i18n="featuresTitle">
-                            Hecho para jugadores
-                        </h2>
-                    </div>
-                    <div class="features-grid">
-                        <div class="feature-card reveal" style="--d: 0.05s">
-                            <span class="feature-icon">🆓</span>
-                            <h3 class="feature-title" data-i18n="feature1Title">
-                                100% gratis
-                            </h3>
-                            <p class="feature-desc" data-i18n="feature1Desc">
-                                Sin cuentas ni pagos. Todas las herramientas son
-                                gratis, para siempre.
-                            </p>
-                        </div>
-                        <div class="feature-card reveal" style="--d: 0.12s">
-                            <span class="feature-icon">🔒</span>
-                            <h3 class="feature-title" data-i18n="feature2Title">
-                                Privado y seguro
-                            </h3>
-                            <p class="feature-desc" data-i18n="feature2Desc">
-                                Tus archivos se procesan en tu navegador y nunca
-                                salen de tu dispositivo.
-                            </p>
-                        </div>
-                        <div class="feature-card reveal" style="--d: 0.19s">
-                            <span class="feature-icon">⚡</span>
-                            <h3 class="feature-title" data-i18n="feature3Title">
-                                Al instante
-                            </h3>
-                            <p class="feature-desc" data-i18n="feature3Desc">
-                                Sin descargas ni instalaciones. Abre una
-                                herramienta y empieza ya.
-                            </p>
-                        </div>
-                        <div class="feature-card reveal" style="--d: 0.26s">
-                            <span class="feature-icon">🎮</span>
-                            <h3 class="feature-title" data-i18n="feature4Title">
-                                Hecho para Xbox
-                            </h3>
-                            <p class="feature-desc" data-i18n="feature4Desc">
-                                Convierte y organiza packs listos para la
-                                carpeta com.mojang de Xbox.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </main>
+			<div class="container hero-grid">
+				<div class="hero-copy">
+					<span class="hero-eyebrow">
+						<span class="dot" aria-hidden="true"></span>
+						<span data-i18n="heroBadge">Herramientas para Minecraft Java y Bedrock</span>
+					</span>
+					<h1 class="hero-title">
+						<span class="line-1">BEDROCK</span>
+						<span class="line-2">TOOLS</span>
+					</h1>
+					<p class="hero-lede" data-i18n="tagline">
+						Convierte addons, calcula coordenadas, organiza tus packs, explora los objetos del
+						juego y crea recetas. Todo corre en tu navegador.
+					</p>
+					<div class="hero-cta">
+						<a class="btn btn-primary" href="#tools" data-i18n="heroCtaPrimary">Explorar herramientas</a>
+						<a class="btn btn-quiet" href="/tools/minecraft-items" data-i18n="heroCtaSecondary">
+							Ver items y bloques
+						</a>
+					</div>
+					<div class="hero-stats">
+						<div class="stat">
+							<span class="stat-num" data-count="1769">0</span>
+							<span class="stat-label" data-i18n="statItems">Objetos catalogados</span>
+						</div>
+						<div class="stat">
+							<span class="stat-num" data-count="7">0</span>
+							<span class="stat-label" data-i18n="statTools">Herramientas</span>
+						</div>
+						<div class="stat">
+							<span class="stat-num" data-count="2">0</span>
+							<span class="stat-label" data-i18n="statLanguages">Idiomas</span>
+						</div>
+						<div class="stat">
+							<span class="stat-num" data-count="0">0</span>
+							<span class="stat-label" data-i18n="statUploads">Archivos subidos</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</header>
 
-        <footer class="site-footer">
-            <div class="container">
-                <div class="footer-brand">Bedrock Tools</div>
-                <p class="footer-tagline" data-i18n="footerTagline">
-                    Herramientas gratuitas para el ecosistema Minecraft Bedrock.
-                </p>
-                <p class="footer-copy" data-i18n="copyright">
-                    Hecho con ❤️ por AgentitoE
-                </p>
-                <p class="footer-links">
-                    <a
-                        class="footer-github"
-                        href="https://github.com/agentitoe/bedrocktools"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="GitHub"
-                    >
-                        <svg
-                            viewBox="0 0 16 16"
-                            width="14"
-                            height="14"
-                            fill="currentColor"
-                            aria-hidden="true"
-                        >
-                            <path
-                                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
-                            />
-                        </svg>
-                        GitHub
-                    </a>
-                </p>
-            </div>
-        </footer>
+		<main id="main">
+			<section class="section" id="tools">
+				<div class="container">
+					<div class="section-head reveal">
+						<span class="section-eyebrow" data-i18n="toolsEyebrow">Herramientas</span>
+						<h2 class="section-title" data-i18n="toolsTitle">Elige tu herramienta</h2>
+						<p class="section-sub" data-i18n="toolsSubtitle">
+							Todo lo que necesitas para Minecraft, en Java y Bedrock.
+						</p>
+					</div>
+					<div class="tools-group reveal">
+						<h3 class="tools-group-title" data-i18n="groupBoth">Java y Bedrock</h3>
+						<div class="tools-grid" id="toolsGridBoth"></div>
+					</div>
+					<div class="tools-group reveal">
+						<h3 class="tools-group-title" data-i18n="groupBedrock">Solo Bedrock</h3>
+						<div class="tools-grid" id="toolsGridBedrock"></div>
+					</div>
+				</div>
+			</section>
 
-        <noscript
-            ><style>
-                .reveal {
-                    opacity: 1;
-                    transform: none;
-                }
-            </style></noscript
-        >
-        <script type="module" src="assets/app.js"></script>
-    </body>
+			<section class="section section-alt">
+				<div class="container">
+					<div class="section-head reveal">
+						<span class="section-eyebrow" data-i18n="featuresEyebrow">Ventajas</span>
+						<h2 class="section-title" data-i18n="featuresTitle">Por qué Bedrock Tools</h2>
+					</div>
+					<div class="features-grid">
+						<article class="feature-card reveal" style="--d: 0.04s">
+							<span class="feature-icon">
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-lock" /></svg>
+							</span>
+							<span class="feature-kicker">01</span>
+							<h3 class="feature-title" data-i18n="feature1Title">Tus archivos no salen del navegador</h3>
+							<p class="feature-desc" data-i18n="feature1Desc">
+								Cada conversión ocurre en tu dispositivo. Ningún pack, receta o comando pasa por
+								un servidor nuestro.
+							</p>
+						</article>
+						<article class="feature-card reveal" style="--d: 0.1s">
+							<span class="feature-icon">
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-zap" /></svg>
+							</span>
+							<span class="feature-kicker">02</span>
+							<h3 class="feature-title" data-i18n="feature2Title">Al instante</h3>
+							<p class="feature-desc" data-i18n="feature2Desc">
+								Abre una herramienta y empieza. Sin descargas, instalaciones ni esperas.
+							</p>
+						</article>
+						<article class="feature-card reveal" style="--d: 0.16s">
+							<span class="feature-icon">
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-gamepad" /></svg>
+							</span>
+							<span class="feature-kicker">03</span>
+							<h3 class="feature-title" data-i18n="feature3Title">Pensado para Xbox y Java</h3>
+							<p class="feature-desc" data-i18n="feature3Desc">
+								Los packs se ordenan en la estructura com.mojang que espera la consola, y las
+								recetas se exportan también como Data Pack.
+							</p>
+						</article>
+						<article class="feature-card reveal" style="--d: 0.22s">
+							<span class="feature-icon">
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-globe" /></svg>
+							</span>
+							<span class="feature-kicker">04</span>
+							<h3 class="feature-title" data-i18n="feature4Title">Gratis, sin cuentas y en dos idiomas</h3>
+							<p class="feature-desc" data-i18n="feature4Desc">
+								No hay registro, ni anuncios, ni versión de pago escondida. Español e inglés en
+								todas las herramientas.
+							</p>
+						</article>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<footer class="site-footer">
+			<div class="container">
+				<div class="footer-inner">
+					<div>
+						<div class="footer-brand">BEDROCK TOOLS</div>
+						<p class="footer-tagline" data-i18n="footerTagline">
+							Herramientas gratuitas para el ecosistema Minecraft, en Java y Bedrock.
+						</p>
+					</div>
+					<nav class="footer-nav" aria-label="Footer">
+						<div class="footer-col">
+							<span class="footer-heading" data-i18n="footerColProject">Proyecto</span>
+							<a
+								class="footer-link"
+								href="https://github.com/agentitoe/bedrocktools"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-external" /></svg>
+								GitHub
+							</a>
+							<a class="footer-link" href="/licenses">
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-file" /></svg>
+								<span data-i18n="footerLicense">Licencias</span>
+							</a>
+							<a
+								class="footer-link"
+								href="https://github.com/agentitoe/bedrocktools/issues"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-folder" /></svg>
+								<span data-i18n="footerIssues">Informar de un error</span>
+							</a>
+						</div>
+					</nav>
+				</div>
+				<div class="footer-bottom">
+					<span data-i18n="copyright">© 2026 AgentitoE</span>
+					<span data-i18n="footerMadeWith">Hecho con ♥ para la comunidad de Minecraft</span>
+				</div>
+			</div>
+		</footer>
+
+		<noscript>
+			<style>
+				.reveal {
+					opacity: 1;
+					transform: none;
+				}
+			</style>
+		</noscript>
+		<script type="module" src="assets/app.js"></script>
+	</body>
 </html>

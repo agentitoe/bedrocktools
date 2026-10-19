@@ -7,8 +7,8 @@ export const manifest = {
 		es: "Crea recetas custom para Bedrock (.mcpack) y Java (Data Pack)",
 		en: "Create custom recipes for Bedrock (.mcpack) and Java (Data Pack)",
 	},
-	icon: "⚒️",
+	icon: "grid3",
 	path: "/tools/recipe-creator",
-	color: "#ef4444",
+	color: "#c14f7c",
 	platforms: ["java", "bedrock"],
 };

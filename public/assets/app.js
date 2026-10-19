@@ -3,68 +3,93 @@ import { initUi, FALLBACK_LANG } from "./ui.js";
 const translations = {
 	es: {
 		title: "Bedrock Tools — Herramientas para Minecraft",
+		skipToContent: "Saltar al contenido",
 		heroBadge: "Herramientas para Minecraft Java y Bedrock",
-		tagline: "Convierte addons, calcula coordenadas, organiza tus packs, explora items y crea recetas para Java y Bedrock. Gratis, sin registro y 100% en tu navegador.",
+		tagline: "Convierte addons, calcula coordenadas, organiza tus packs, explora los objetos del juego y crea recetas. Todo corre en tu navegador.",
 		heroCtaPrimary: "Explorar herramientas",
 		heroCtaSecondary: "Ver items y bloques",
+		statItems: "Objetos catalogados",
 		statTools: "Herramientas",
-		statFree: "Gratis",
 		statLanguages: "Idiomas",
-		statLimits: "Sin límites",
+		statUploads: "Archivos subidos",
 		toolsEyebrow: "Herramientas",
 		toolsTitle: "Elige tu herramienta",
 		toolsSubtitle: "Todo lo que necesitas para Minecraft, en Java y Bedrock.",
 		groupBoth: "Java y Bedrock",
 		groupBedrock: "Solo Bedrock",
-		openTool: "Abrir herramienta",
+		openTool: "Abrir",
+		toolsLoadError: "No pudimos cargar la lista de herramientas. Recarga la página para intentarlo de nuevo.",
 		featuresEyebrow: "Ventajas",
-		featuresTitle: "Hecho para jugadores",
-		feature1Title: "100% gratis",
-		feature1Desc: "Sin cuentas ni pagos. Todas las herramientas son gratis, para siempre.",
-		feature2Title: "Privado y seguro",
-		feature2Desc: "Tus archivos se procesan en tu navegador y nunca salen de tu dispositivo.",
-		feature3Title: "Al instante",
-		feature3Desc: "Sin descargas ni instalaciones. Abre una herramienta y empieza ya.",
-		feature4Title: "Hecho para Xbox",
-		feature4Desc: "Convierte y organiza packs listos para la carpeta com.mojang de Xbox.",
-		footerTagline: "Herramientas gratuitas para Minecraft, en Java y Bedrock.",
-		copyright: "Hecho con ♥️ por AgentitoE",
+		featuresTitle: "Por qué Bedrock Tools",
+		feature1Title: "Tus archivos no salen del navegador",
+		feature1Desc: "Cada conversión ocurre en tu dispositivo. Ningún pack, receta o comando pasa por un servidor nuestro.",
+		feature2Title: "Al instante",
+		feature2Desc: "Abre una herramienta y empieza. Sin descargas, instalaciones ni esperas.",
+		feature3Title: "Pensado para Xbox y Java",
+		feature3Desc: "Los packs se ordenan en la estructura com.mojang que espera la consola, y las recetas se exportan también como Data Pack.",
+		feature4Title: "Gratis, sin cuentas y en dos idiomas",
+		feature4Desc: "No hay registro, ni anuncios, ni versión de pago escondida. Español e inglés en todas las herramientas.",
+		footerTagline: "Herramientas gratuitas para el ecosistema Minecraft, en Java y Bedrock.",
+		footerColProject: "Proyecto",
+		footerLicense: "Licencias",
+		footerIssues: "Informar de un error",
+		copyright: "© 2026 AgentitoE",
+		footerMadeWith: "Hecho con ♥ para la comunidad de Minecraft",
 		changeLanguageTitle: "Cambiar idioma",
 		switchToLightTitle: "Cambiar a tema claro",
 		switchToDarkTitle: "Cambiar a tema oscuro",
 	},
 	en: {
 		title: "Bedrock Tools — Tools for Minecraft",
+		skipToContent: "Skip to content",
 		heroBadge: "Tools for Minecraft Java & Bedrock",
-		tagline: "Convert addons, calculate coordinates, organize your packs, browse items and create recipes for Java and Bedrock. Free, no sign-up, 100% in your browser.",
+		tagline: "Convert addons, calculate coordinates, organize your packs, browse every item in the game and write recipes. It all runs in your browser.",
 		heroCtaPrimary: "Explore tools",
 		heroCtaSecondary: "Browse items & blocks",
+		statItems: "Items catalogued",
 		statTools: "Tools",
-		statFree: "Free",
 		statLanguages: "Languages",
-		statLimits: "No limits",
+		statUploads: "Files uploaded",
 		toolsEyebrow: "Tools",
 		toolsTitle: "Pick your tool",
 		toolsSubtitle: "Everything you need for Minecraft, on Java and Bedrock.",
 		groupBoth: "Java & Bedrock",
 		groupBedrock: "Bedrock only",
-		openTool: "Open tool",
+		openTool: "Open",
+		toolsLoadError: "We couldn't load the tool list. Reload the page to try again.",
 		featuresEyebrow: "Benefits",
-		featuresTitle: "Built for players",
-		feature1Title: "100% free",
-		feature1Desc: "No accounts, no payments. Every tool is free, forever.",
-		feature2Title: "Private & secure",
-		feature2Desc: "Your files are processed in your browser and never leave your device.",
-		feature3Title: "Instant",
-		feature3Desc: "No downloads or installs. Open a tool and start right away.",
-		feature4Title: "Made for Xbox",
-		feature4Desc: "Convert and organize packs ready for the com.mojang folder on Xbox.",
-		footerTagline: "Free tools for Minecraft, on Java and Bedrock.",
-		copyright: "Made with ♥️ by AgentitoE",
+		featuresTitle: "Why Bedrock Tools",
+		feature1Title: "Your files never leave the browser",
+		feature1Desc: "Every conversion happens on your device. No pack, recipe or command goes through a server of ours.",
+		feature2Title: "Instant",
+		feature2Desc: "Open a tool and start. No downloads, no installs, no waiting.",
+		feature3Title: "Built for Xbox and Java",
+		feature3Desc: "Packs are laid out in the com.mojang structure the console expects, and recipes export as a Data Pack too.",
+		feature4Title: "Free, no accounts, two languages",
+		feature4Desc: "No sign-up, no ads, no hidden paid tier. Spanish and English across every tool.",
+		footerTagline: "Free tools for the Minecraft ecosystem, on Java and Bedrock.",
+		footerColProject: "Project",
+		footerLicense: "Licenses",
+		footerIssues: "Report a bug",
+		copyright: "© 2026 AgentitoE",
+		footerMadeWith: "Made with ♥ for the Minecraft community",
 		changeLanguageTitle: "Change language",
 		switchToLightTitle: "Switch to light theme",
 		switchToDarkTitle: "Switch to dark theme",
 	},
+};
+
+const ARROW = '<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-arrow-right"/></svg>';
+
+/** Tool identity glyphs, keyed by the `icon` field of each manifest. */
+const TOOL_ICONS = {
+	blocks: "i-blocks",
+	cube: "i-cube",
+	grid3: "i-grid3",
+	axes: "i-axes",
+	convert: "i-convert",
+	stack: "i-stack",
+	"file-code": "i-file-code",
 };
 
 function pickLocalized(obj, lang) {
@@ -72,14 +97,47 @@ function pickLocalized(obj, lang) {
 	return obj[lang] ?? obj[FALLBACK_LANG] ?? Object.values(obj)[0] ?? "";
 }
 
+function toolIcon(iconKey) {
+	const id = TOOL_ICONS[iconKey] ?? "i-cube";
+	return `<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#${id}"/></svg>`;
+}
+
+function platformLabel(tool, lang) {
+	const platforms = Array.isArray(tool.platforms) ? tool.platforms : ["bedrock"];
+	const both = platforms.indexOf("java") !== -1 && platforms.indexOf("bedrock") !== -1;
+	if (both) return lang === "es" ? "Java + Bedrock" : "Java + Bedrock";
+	return lang === "es" ? "Solo Bedrock" : "Bedrock only";
+}
+
 function toolCard(tool, i, lang) {
 	const t = translations[lang];
+	const color = encodeURIComponent(tool.color || "#54b932");
 	return (
-		'<a class="tool-card reveal" style="--tool-color:' + tool.color + ';--d:' + (i * 0.06) + 's" href="' + tool.path + '">' +
-		'<span class="tool-icon-tile">' + tool.icon + '</span>' +
-		'<span class="tool-name">' + pickLocalized(tool.name, lang) + '</span>' +
-		'<span class="tool-desc">' + pickLocalized(tool.description, lang) + '</span>' +
-		'<span class="tool-link">' + t.openTool + ' <span class="arrow">→</span></span>' +
+		'<a class="tool-card reveal" style="--tool-color:' +
+		color +
+		";--d:" +
+		i * 0.06 +
+		's" href="' +
+		tool.path +
+		'">' +
+		'<span class="tool-icon-tile">' +
+		toolIcon(tool.icon) +
+		"</span>" +
+		'<span class="tool-name">' +
+		pickLocalized(tool.name, lang) +
+		"</span>" +
+		'<span class="tool-desc">' +
+		pickLocalized(tool.description, lang) +
+		"</span>" +
+		'<span class="tool-foot">' +
+		'<span class="tool-platform">' +
+		platformLabel(tool, lang) +
+		"</span>" +
+		'<span class="tool-go">' +
+		t.openTool +
+		ARROW +
+		"</span>" +
+		"</span>" +
 		"</a>"
 	);
 }
@@ -89,7 +147,10 @@ function initGrid(lang) {
 	const bedrockGrid = document.getElementById("toolsGridBedrock");
 	if (!bothGrid && !bedrockGrid) return;
 	fetch("/tools-manifest.json")
-		.then((res) => res.json())
+		.then((res) => {
+			if (!res.ok) throw new Error("HTTP " + res.status);
+			return res.json();
+		})
 		.then((tools) => {
 			const isBoth = (tool) =>
 				Array.isArray(tool.platforms) &&
@@ -105,12 +166,31 @@ function initGrid(lang) {
 				bedrockGrid.innerHTML = bedrockOnly.map((tool, i) => toolCard(tool, i, lang)).join("");
 			}
 			observeReveals();
+			trackCardPointers();
 		})
 		.catch((err) => {
 			console.error("Fetch error:", err);
-			if (bothGrid) bothGrid.innerHTML = '<p style="color:var(--muted)">No tools available.</p>';
+			const message =
+				'<p class="tool-desc">' + translations[lang].toolsLoadError + "</p>";
+			if (bothGrid) bothGrid.innerHTML = message;
 			if (bedrockGrid) bedrockGrid.innerHTML = "";
 		});
+}
+
+/**
+ * Highlights the card under the cursor. One delegated listener covers every
+ * card, including the ones rendered after a language change.
+ */
+function trackCardPointers() {
+	for (const card of document.querySelectorAll(".tool-card")) {
+		if (card.dataset.pointerTracked) continue;
+		card.dataset.pointerTracked = "1";
+		card.addEventListener("pointermove", (e) => {
+			const rect = card.getBoundingClientRect();
+			card.style.setProperty("--mx", ((e.clientX - rect.left) / rect.width) * 100 + "%");
+			card.style.setProperty("--my", ((e.clientY - rect.top) / rect.height) * 100 + "%");
+		});
+	}
 }
 
 let revealObserver = null;
@@ -151,16 +231,17 @@ function initStats() {
 	const counters = Array.from(document.querySelectorAll(".stat-num[data-count]"));
 	if (!counters.length) return;
 
+	const format = new Intl.NumberFormat(document.documentElement.lang || "es");
+
 	const animate = (el) => {
 		const target = parseInt(el.getAttribute("data-count"), 10);
-		const suffix = el.getAttribute("data-suffix") || "";
 		if (Number.isNaN(target)) return;
 		const duration = 1300;
 		const start = performance.now();
 		const tick = (now) => {
 			const p = Math.min((now - start) / duration, 1);
 			const eased = 1 - Math.pow(1 - p, 3);
-			el.textContent = Math.round(target * eased) + suffix;
+			el.textContent = format.format(Math.round(target * eased));
 			if (p < 1) requestAnimationFrame(tick);
 		};
 		requestAnimationFrame(tick);

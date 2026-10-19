@@ -2,8 +2,13 @@ import type { TranslationTable } from './types';
 
 export const translations: TranslationTable = {
 	es: {
+		skipToContent: "Saltar al contenido",
+		footerColProject: "Proyecto",
+		footerLicense: "Licencias",
+		footerAllTools: "Todas las herramientas",
+		footerMadeWith: "Hecho con ♥ para la comunidad de Minecraft",
 		title: "Creador de /give — Bedrock Tools",
-		heading: "🎁 Creador de /give",
+		heading: "Creador de /give",
 		description: "Genera comandos /give personalizados para Minecraft Java y Bedrock: nombre, lore, encantamientos, atributos, pociones, fuegos artificiales y mucho más.",
 		changeLanguageTitle: "Cambiar idioma",
 		switchToLightTitle: "Cambiar a tema claro",
@@ -269,8 +274,13 @@ export const translations: TranslationTable = {
 		ench_wind_burst: "Ráfaga de viento",
 	},
 	en: {
+		skipToContent: "Skip to content",
+		footerColProject: "Project",
+		footerLicense: "Licenses",
+		footerAllTools: "All tools",
+		footerMadeWith: "Made with ♥ for the Minecraft community",
 		title: "/give Generator — Bedrock Tools",
-		heading: "🎁 /give Generator",
+		heading: "/give Generator",
 		description: "Generate custom /give commands for Minecraft Java and Bedrock: name, lore, enchantments, attributes, potions, fireworks and much more.",
 		changeLanguageTitle: "Change language",
 		switchToLightTitle: "Switch to light theme",

@@ -7,8 +7,8 @@ export const manifest = {
 		es: "Crea y edita behavior packs y resource packs de Minecraft Bedrock en el navegador.",
 		en: "Create and edit Minecraft Bedrock behavior and resource packs in your browser.",
 	},
-	icon: "🧩",
+	icon: "file-code",
 	path: "/tools/addon-editor",
-	color: "#f5a623",
+	color: "#c9853c",
 	platforms: ["bedrock"],
 };

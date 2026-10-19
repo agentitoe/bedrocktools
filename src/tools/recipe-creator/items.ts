@@ -1,12 +1,10 @@
 import type { AnyItem, CustomItemData, ItemData } from './types';
 import { allItems, customItems, currentLang, allocateCustomId } from './state';
 import { titleCase } from './util';
-import { renderModel } from '../minecraft-items/canvas-renderer';
+import { createIconElement } from '../../shared/mc-render/icons';
+import type { IconItem } from '../../shared/mc-render/icons';
 
-// ---- Item rendering (reuses minecraft-items models + textures) ----
-
-const modelRenderCache = new Map<string, HTMLCanvasElement>();
-const modelLoadingSet = new Set<string>();
+// ---- Item rendering (delegates to the shared icon factory) ----
 
 const PLACEHOLDER_SVG = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22 viewBox=%220 0 48 48%22%3E%3Crect fill=%22%23666%22 width=%2248%22 height=%2248%22/%3E%3Ctext x=%2250%25%22 y=%2255%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2214%22 font-family=%22monospace%22%3E?%3C/text%3E%3C/svg%3E";
 
@@ -74,77 +72,29 @@ export function extractItemIdentifier(value: any): string | null {
 	return null;
 }
 
-function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
-	const clone = document.createElement('canvas');
-	clone.width = source.width;
-	clone.height = source.height;
-	const ctx = clone.getContext('2d')!;
-	ctx.imageSmoothingEnabled = false;
-	ctx.drawImage(source, 0, 0);
-	return clone;
-}
-
-function createFlatImage(item: AnyItem, size: number): HTMLImageElement {
-	const img = document.createElement('img');
-	img.alt = getItemName(item);
-	img.loading = 'lazy';
-	img.width = size;
-	img.height = size;
-	img.onerror = () => {
-		img.onerror = null;
-		img.src = PLACEHOLDER_SVG;
+/** The render description the shared icon factory needs for this item. */
+function toIconItem(item: AnyItem): IconItem {
+	// `CustomItemData` (extracted from an imported addon) carries no model, so it
+	// can only ever be a flat texture.
+	if ('kind' in item) return { id: item.id, textureUrl: item.textureUrl };
+	return {
+		id: item.id,
+		renderAs: item.renderAs,
+		modelName: item.modelName,
+		textureUrl: item.textureUrl
 	};
-	img.src = item.textureUrl || PLACEHOLDER_SVG;
-	return img;
-}
-
-function updateInPlace(cacheKey: string, size: number): void {
-	const canvas = modelRenderCache.get(cacheKey);
-	if (!canvas) return;
-	document.querySelectorAll(`[data-render-key="${cacheKey}"]`).forEach((el) => {
-		if (!(el instanceof HTMLImageElement)) return;
-		const c = document.createElement('canvas');
-		c.width = size;
-		c.height = size;
-		const ctx = c.getContext('2d')!;
-		ctx.imageSmoothingEnabled = false;
-		ctx.drawImage(canvas, 0, 0, size, size);
-		el.replaceWith(c);
-	});
-}
-
-function triggerModelRender(modelName: string, size: number): void {
-	const cacheKey = `${modelName}:${size}`;
-	if (modelRenderCache.has(cacheKey) || modelLoadingSet.has(cacheKey)) return;
-	modelLoadingSet.add(cacheKey);
-	renderModel(modelName, { size })
-		.then((canvas) => {
-			if (canvas && !modelRenderCache.has(cacheKey)) {
-				modelRenderCache.set(cacheKey, canvas);
-				updateInPlace(cacheKey, size);
-			}
-		})
-		.catch(() => {})
-		.finally(() => modelLoadingSet.delete(cacheKey));
 }
 
 export function createImgTag(item: AnyItem, size = 48): HTMLCanvasElement | HTMLImageElement {
-	if ('modelName' in item && item.renderAs === 'block' && item.modelName) {
-		const modelName = item.modelName;
-		const cacheKey = `${modelName}:${size}`;
-		const cached = modelRenderCache.get(cacheKey);
-		if (cached) return cloneCanvas(cached);
-
-		const img = createFlatImage(item, size);
-		img.dataset.renderKey = cacheKey;
-		// Defer the 3D render until the flat texture actually loads (browsers
-		// lazy-load images), so off-screen items don't fetch models/textures.
-		if (img.complete) {
-			triggerModelRender(modelName, size);
-		} else {
-			img.addEventListener('load', () => triggerModelRender(modelName, size), { once: true });
-		}
-		return img;
+	const icon = createIconElement(toIconItem(item), size);
+	if (icon instanceof HTMLImageElement) {
+		const image: HTMLImageElement = icon;
+		image.alt = getItemName(item);
+		if (image.getAttribute('src') === null) image.src = PLACEHOLDER_SVG;
+		image.onerror = () => {
+			image.onerror = null;
+			image.src = PLACEHOLDER_SVG;
+		};
 	}
-	return createFlatImage(item, size);
+	return icon;
 }

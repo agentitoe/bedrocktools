@@ -7,6 +7,17 @@ import { writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync, readFile
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
+import {
+	buildBannerModel,
+	buildBedModel,
+	buildChestModel,
+	buildDecoratedPotModel,
+	buildGolemStatueModel,
+	buildHeadModel,
+	buildShieldModel,
+	DRAGON_HEAD_REGIONS,
+	HEAD_REGIONS
+} from './special-blocks.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -57,34 +68,6 @@ const HEAD_SKINS = {
 	piglin: 'textures/entity/piglin/piglin.png',
 	dragon: 'textures/entity/enderdragon/dragon.png',
 	player: 'textures/entity/player/wide/steve.png'
-};
-
-// Standard Minecraft skin head UV regions (pixel coordinates within the skin).
-// For humanoid skins (64x64 / 64x32) these are always the same top-left region.
-// face -> [x1, y1, x2, y2]
-//
-// NOTE: the face (eyes) lives on the entity model's +Z (= "south" in block-model
-// terms) face. The isometric renderer shows the +Z face as the front, so the
-// face region must be assigned to "south" — assigning it to "north" puts the
-// back of the head toward the camera (heads looked "reversed" with no eyes).
-const HEAD_REGIONS = {
-	up: [8, 0, 16, 8],       // top of head
-	down: [16, 0, 24, 8],    // bottom of head
-	north: [24, 8, 32, 16],  // back of head
-	south: [8, 8, 16, 16],   // front (face, eyes)
-	west: [0, 8, 8, 16],     // right side
-	east: [16, 8, 24, 16]    // left side
-};
-
-// The dragon head lives in a non-humanoid 256x256 texture (16x16x16 head box at
-// texOffs(0,0)), so its UV regions differ from the standard humanoid layout.
-const DRAGON_HEAD_REGIONS = {
-	up: [16, 0, 32, 16],
-	down: [32, 0, 48, 16],
-	north: [48, 16, 64, 32],
-	south: [16, 16, 32, 32],
-	west: [0, 16, 16, 32],
-	east: [32, 16, 48, 32]
 };
 
 async function fetchJson(url) {
@@ -156,6 +139,8 @@ function detectSpecialModel(model) {
 					return { renderAs: 'chest', texture: String(inner.texture || 'normal') };
 				case 'minecraft:copper_golem_statue':
 					return { renderAs: 'golem_statue', texture: String(inner.texture || '') };
+				case 'minecraft:decorated_pot':
+					return { renderAs: 'decorated_pot' };
 				default:
 					return null;
 			}
@@ -685,94 +670,6 @@ async function downloadSkin(remoteUrl, localPath) {
 }
 
 /**
- * Build a full bed block model (head + foot) referencing the given bed texture.
- * Geometry replicates the vanilla bed model (head board + frame + legs). UVs are
- * in 0-16 space mapping onto the 64x64 `entity/bed/{color}.png` atlas.
- */
-function buildBedModel(textureName) {
-	// Foot part elements (from vanilla template_bed_foot).
-	const foot = [
-		{
-			from: [0, 0, 0], to: [3, 3, 3],
-			faces: {
-				north: { uv: [12.5, 5.25, 13.25, 6], texture: '#bed' },
-				east: { uv: [14.75, 5.25, 15.5, 6], texture: '#bed' },
-				south: { uv: [14, 5.25, 14.75, 6], texture: '#bed' },
-				west: { uv: [13.25, 5.25, 14, 6], texture: '#bed' },
-				down: { uv: [14, 4.5, 14.75, 5.25], texture: '#bed' }
-			}
-		},
-		{
-			from: [13, 0, 0], to: [16, 3, 3],
-			faces: {
-				north: { uv: [14, 3.75, 13.25, 4.5], texture: '#bed' },
-				east: { uv: [12.5, 3.75, 13.25, 4.5], texture: '#bed' },
-				south: { uv: [14.75, 3.75, 15.5, 4.5], texture: '#bed' },
-				west: { uv: [14, 3.75, 14.75, 4.5], texture: '#bed' },
-				down: { uv: [14, 3, 14.75, 3.75], texture: '#bed' }
-			}
-		},
-		{
-			from: [0, 3, 0], to: [16, 9, 16],
-			faces: {
-				north: { uv: [5.5, 5.5, 9.5, 7], rotation: 180, texture: '#bed' },
-				east: { uv: [0, 7, 1.5, 11], rotation: 270, texture: '#bed' },
-				west: { uv: [5.5, 7, 7, 11], rotation: 90, texture: '#bed' },
-				up: { uv: [1.5, 7, 5.5, 11], rotation: 180, texture: '#bed' },
-				down: { uv: [7, 7, 11, 11], texture: '#bed' }
-			}
-		}
-	];
-
-	// Head part elements (from vanilla template_bed_head), offset +16 along Z so
-	// the head block sits next to the foot block.
-	const head = [
-		{
-			from: [0, 0, 13], to: [3, 3, 16],
-			faces: {
-				north: { uv: [14.75, 0.75, 15.5, 1.5], texture: '#bed' },
-				east: { uv: [14, 0.75, 14.75, 1.5], texture: '#bed' },
-				south: { uv: [13.25, 0.75, 14, 1.5], texture: '#bed' },
-				west: { uv: [12.5, 0.75, 13.25, 1.5], texture: '#bed' },
-				down: { uv: [14, 0, 14.75, 0.75], texture: '#bed' }
-			}
-		},
-		{
-			from: [13, 0, 13], to: [16, 3, 16],
-			faces: {
-				north: { uv: [14, 2.25, 14.75, 3], texture: '#bed' },
-				east: { uv: [13.25, 2.25, 14, 3], texture: '#bed' },
-				south: { uv: [12.5, 2.25, 13.25, 3], texture: '#bed' },
-				west: { uv: [14.75, 2.25, 15.5, 3], texture: '#bed' },
-				down: { uv: [14, 1.5, 14.75, 2.25], texture: '#bed' }
-			}
-		},
-		{
-			from: [0, 3, 0], to: [16, 9, 16],
-			faces: {
-				east: { uv: [0, 1.5, 1.5, 5.5], rotation: 270, texture: '#bed' },
-				south: { uv: [1.5, 0, 5.5, 1.5], rotation: 180, texture: '#bed' },
-				west: { uv: [5.5, 1.5, 7, 5.5], rotation: 90, texture: '#bed' },
-				up: { uv: [1.5, 1.5, 5.5, 5.5], rotation: 180, texture: '#bed' },
-				down: { uv: [7, 1.5, 11, 5.5], texture: '#bed' }
-			}
-		}
-	].map((el) => ({
-		from: [el.from[0], el.from[1], el.from[2] + 16],
-		to: [el.to[0], el.to[1], el.to[2] + 16],
-		faces: el.faces
-	}));
-
-	return {
-		textures: { bed: textureName },
-		display: {
-			gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] }
-		},
-		elements: [...foot, ...head]
-	};
-}
-
-/**
  * Download banner_base.png and split it into a tinted cloth texture and a brown
  * pole texture (both saved under /textures/block so the 3D banner model can use
  * them). The cloth is left of the first fully-transparent column, the pole is to
@@ -795,10 +692,11 @@ async function downloadBannerParts(color, hex) {
 
 	mkdirSync(dirname(clothPath), { recursive: true });
 
-	const tintCrop = (x0, x1, rgb) => {
+	const tintCrop = (x0, x1, rgb, yMax = h) => {
 		const cw = x1 - x0;
-		const out = Buffer.alloc(cw * h * 4);
-		for (let y = 0; y < h; y++) {
+		const ch = Math.min(h, yMax);
+		const out = Buffer.alloc(cw * ch * 4);
+		for (let y = 0; y < ch; y++) {
 			for (let x = 0; x < cw; x++) {
 				const si = (y * w + x0 + x) * 4;
 				const di = (y * cw + x) * 4;
@@ -808,11 +706,14 @@ async function downloadBannerParts(color, hex) {
 				out[di + 3] = data[si + 3];
 			}
 		}
-		return sharp(out, { raw: { width: cw, height: h, channels: 4 } });
+		return sharp(out, { raw: { width: cw, height: ch, channels: 4 } });
 	};
 
+	// The cloth crop stops before the brown stand strip at the bottom of the
+	// base sheet and before the transparent/noise columns right of the flag;
+	// keeping them painted dark bands across the flag face.
 	if (!existsSync(clothPath)) {
-		await tintCrop(0, split, cloth)
+		await tintCrop(0, split, cloth, 42)
 			.trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
 			.webp({ lossless: true, effort: 4 })
 			.toFile(clothPath);
@@ -826,121 +727,6 @@ async function downloadBannerParts(color, hex) {
 	}
 
 	return { cloth: `banner_cloth_${color}`, pole: 'banner_pole' };
-}
-
-/** Build a head block model JSON referencing the given skin texture name. */
-function buildHeadModel(skinName, { width, height }, regions = HEAD_REGIONS) {
-	const uv = {};
-	for (const [face, region] of Object.entries(regions)) {
-		uv[face] = [
-			region[0] * 16 / width,
-			region[1] * 16 / height,
-			region[2] * 16 / width,
-			region[3] * 16 / height
-		];
-	}
-	return {
-		textures: { skin: skinName },
-		display: {
-			gui: { rotation: [30, 45, 0], translation: [0, 3, 0], scale: [1, 1, 1] }
-		},
-		elements: [
-			{
-				from: [4, 0, 4],
-				to: [12, 8, 12],
-				faces: {
-					down: { uv: uv.down, texture: '#skin' },
-					up: { uv: uv.up, texture: '#skin' },
-					north: { uv: uv.north, texture: '#skin' },
-					south: { uv: uv.south, texture: '#skin' },
-					west: { uv: uv.west, texture: '#skin' },
-					east: { uv: uv.east, texture: '#skin' }
-				}
-			}
-		]
-	};
-}
-
-/**
- * Build a cuboid element whose faces all use the same texture. `uvMap` may be a
- * flat [u1,v1,u2,v2] array (applied to every face) or a per-face map
- * { north: [u1,v1,u2,v2], ... }.
- */
-function cuboid(from, to, texture, uvMap) {
-	const flat = Array.isArray(uvMap) ? uvMap : null;
-	const faces = {};
-	for (const f of ['down', 'up', 'north', 'south', 'west', 'east']) {
-		const uv = flat ? flat : (uvMap && Array.isArray(uvMap[f]) ? uvMap[f] : [0, 0, 16, 16]);
-		faces[f] = { uv, texture };
-	}
-	return { from, to, faces };
-}
-
-/**
- * Build a chest block model (body + lid + latch). The 26.1 chest texture
- * (entity/chest/*.png) is 64x64, so UV = pixel / 4. The latch sits on the south
- * face, which the [30,45,0] gui transform shows toward the camera.
- */
-function buildChestModel(textureName) {
-	const bodyFront = [3.5, 4.75, 10.5, 8];   // body front (14,19)-(42,32)
-	const lidFront = [3.5, 0, 10.5, 3.5];     // lid front (14,0)-(42,14)
-	const lidTop = [0, 3.5, 14, 4.5];         // lid top (0,14)-(56,18)
-	const top = [0, 8.25, 14, 10.75];         // body top/bottom (0,33)-(56,43)
-	const latch = [8.25, 5.25, 10.5, 7.5];    // latch (33,21)-(42,30)
-
-	return {
-		textures: { chest: textureName },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([0, 0, 0], [16, 10, 14], '#chest', { north: bodyFront, south: bodyFront, east: bodyFront, west: bodyFront, up: top, down: top }),
-			cuboid([0, 10, 0], [16, 14, 14], '#chest', { north: lidFront, south: lidFront, east: lidFront, west: lidFront, up: lidTop }),
-			cuboid([7, 10, 14], [9, 13, 15], '#chest', latch)
-		]
-	};
-}
-
-/**
- * Build a copper golem statue model (pedestal + body + head). The golem texture
- * (entity/copper_golem/copper_golem*.png) is 64x64, so UV = pixel / 4.
- */
-function buildGolemStatueModel(textureName) {
-	const head = [2.5, 0, 6.5, 2];  // head (10,0)-(26,8)
-	const body = [0, 2.5, 8, 4];    // body (0,10)-(32,16)
-	return {
-		textures: { golem: textureName },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([3, 0, 3], [13, 2, 13], '#golem', body),
-			cuboid([5, 2, 5], [11, 8, 11], '#golem', body),
-			cuboid([6, 8, 6], [10, 13, 10], '#golem', head)
-		]
-	};
-}
-
-/**
- * Build a shield model: a thin vertical slab carrying the (pre-rotated)
- * shield_base texture. The transparent background reveals the shield shape.
- */
-function buildShieldModel(textureName) {
-	return {
-		textures: { shield: textureName },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([5, 1, 7], [11, 15, 8], '#shield')
-		]
-	};
-}
-
-/** Build a banner model: a vertical pole with the tinted cloth hanging beside it. */
-function buildBannerModel(clothTexture, poleTexture) {
-	return {
-		textures: { cloth: clothTexture, pole: poleTexture },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([7, 0, 7], [9, 15, 9], '#pole'),
-			cuboid([2, 3, 8], [7, 13, 8.5], '#cloth')
-		]
-	};
 }
 
 function removeStalePngTextures() {
@@ -1215,6 +1001,17 @@ async function extractData() {
 		info.renderAs = 'block';
 		info.modelName = `banner_${color}`;
 		info.textures = [{ namespace: 'block', name: parts.cloth }, { namespace: 'block', name: parts.pole }];
+	}
+
+	// Convert `minecraft:decorated_pot` specials into a generated 3D vase model.
+	// The vanilla block model only carries a particle texture and terracotta is
+	// already downloaded for the standard blocks, so no texture work is needed.
+	for (const info of resolved.values()) {
+		if (info.renderAs !== 'decorated_pot') continue;
+		writeFileSync(join(headsDir, 'decorated_pot.json'), JSON.stringify(buildDecoratedPotModel()));
+		info.renderAs = 'block';
+		info.modelName = 'decorated_pot';
+		info.textures = [{ namespace: 'block', name: 'terracotta' }];
 	}
 
 	// Collect block model names + texture download tasks.

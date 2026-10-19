@@ -7,7 +7,7 @@ export const manifest = {
 		es: "Descripción de lo que hace esta herramienta.",
 		en: "Description of what this tool does.",
 	},
-	icon: "🔧",
+	icon: "cube",
 	path: "/tools/new-tool",
-	color: "#2563eb",
+	color: "#4a86c8",
 };

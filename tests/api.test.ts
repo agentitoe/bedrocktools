@@ -132,11 +132,15 @@ describe("model resolution", () => {
 		};
 		const resolved = resolveModel(all, "stone");
 		expect(resolved).not.toBeNull();
-		// A grandparent's literal texture wins over the child's #ref (client semantics).
-		expect(resolved?.textures.texture).toBe("block/base");
+		// Vanilla semantics: the leaf's literal texture wins over its ancestors,
+		// and #refs declared by ancestors resolve against the accumulated
+		// root→leaf map (so `particle`/`all` follow `stone`'s override).
+		expect(resolved?.textures.texture).toBe("block/stone");
+		expect(resolved?.textures.particle).toBe("block/stone");
 		expect(resolved?.textures.all).toBe("block/stone");
-		expect(resolved?.textures.particle).toBe("block/base");
-		expect(resolved?.elements).toEqual([{ from: [0, 0, 0] }]);
+		// cube_all declares an (empty) elements array, which replaces the
+		// grandparent's cuboids instead of being appended to them.
+		expect(resolved?.elements).toEqual([]);
 		expect(resolved?.display).toEqual({ gui: { rotation: [30, 225, 0] } });
 	});
 

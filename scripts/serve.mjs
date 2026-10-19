@@ -76,6 +76,30 @@ const server = createServer(async (req, res) => {
 		res.writeHead(200, { "Content-Type": type, "Cache-Control": "no-store" });
 		res.end(data);
 	} catch {
+		// Extensionless pretty URLs: "/licenses" -> "/licenses.html".
+		// Cloudflare Pages does this natively; mirror it locally.
+		if (!extname(filePath)) {
+			try {
+				const data = await readFile(filePath + ".html");
+				res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+				return res.end(data);
+			} catch {
+				// fall through to the 404 handler
+			}
+		}
+		// Production (Cloudflare Pages) serves 404.html for unknown paths;
+		// mirror that locally so the page is testable before deploying.
+		const wantsHtml = (req.headers.accept || "").includes("text/html");
+		const notFound = join(root, "404.html");
+		try {
+			const data = await readFile(notFound);
+			if (wantsHtml) {
+				res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+				return res.end(data);
+			}
+		} catch {
+			// 404.html itself is missing — fall through to the plain-text body.
+		}
 		res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
 		res.end("Not found");
 	}

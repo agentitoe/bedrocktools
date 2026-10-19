@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="Licencias y atribuciones de terceros de Bedrock Tools." />
+		<title>Licencias — Bedrock Tools</title>
+		<link rel="icon" type="image/webp" href="/assets/favicon.svg" />
+		<link rel="apple-touch-icon" href="/assets/favicon.svg" />
+		<link rel="stylesheet" href="/assets/styles.css" />
+	</head>
+	<body>
+		<a class="skip-link" href="#main" data-i18n="skipToContent">Saltar al contenido</a>
+
+		<div class="top-bar">
+			<button
+				class="icon-btn lang-toggle"
+				id="langToggle"
+				title="Cambiar idioma"
+				aria-label="Cambiar idioma"
+			></button>
+			<div class="lang-dropdown" id="langDropdown" role="menu"></div>
+			<button
+				class="icon-btn theme-toggle"
+				id="themeToggle"
+				title="Cambiar tema"
+				aria-label="Cambiar tema"
+			></button>
+		</div>
+
+		<main id="main">
+			<div class="licenses">
+				<a class="back-link" href="/">
+					<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-arrow-left" /></svg>
+					<span data-i18n="backHome">Volver al inicio</span>
+				</a>
+				<div class="card">
+					<h1 data-i18n="licensesTitle">Licencias</h1>
+					<p class="subtitle" data-i18n="licensesSubtitle">
+						Atribución de los recursos de terceros que usa este sitio.
+					</p>
+					<p data-i18n="licensesIntro">
+						Bedrock Tools no es de su propiedad ni está afiliado a Mojang o
+						Microsoft. Los datos y texturas que usa el sitio proceden de los
+						proyectos de código abierto que se listan aquí; cada uno conserva su
+						licencia y su copyright, y se citan con la atribución que estos
+						proyectos piden.
+					</p>
+				</div>
+
+				<div class="card">
+					<h2 data-i18n="minecraftAssetsTitle">Minecraft assets (texturas, modelos y recetas)</h2>
+					<p data-i18n="minecraftAssetsBody">
+						Los modelos 3D, texturas y recetas que se descargan durante el build
+						proceden del repositorio InventivetalentDev/minecraft-assets, que
+						empaqueta los assets oficiales de Minecraft. Mojang conserva los
+						derechos sobre el contenido del juego; este sitio no lo redistribuye
+						en producción.
+					</p>
+					<ul>
+						<li data-i18n="minecraftAssetsRepo">Repositorio: github.com/InventivetalentDev/minecraft-assets</li>
+						<li data-i18n="minecraftAssetsLicense">Licencia: MIT (ver el archivo LICENSE del repositorio)</li>
+					</ul>
+				</div>
+
+				<div class="card">
+					<h2 data-i18n="geyserTitle">GeyserMC mapeo de items Java ↔ Bedrock</h2>
+					<p data-i18n="geyserBody">
+						El archivo geyser-item-map.json procede del repositorio
+						GeyserMC/mappings y se usa para traducir IDs entre Java y Bedrock.
+					</p>
+					<ul>
+						<li data-i18n="geyserRepo">Repositorio: github.com/GeyserMC/mappings</li>
+						<li data-i18n="geyserLicense">Licencia: MIT (ver el archivo LICENSE del repositorio)</li>
+					</ul>
+				</div>
+
+				<div class="card">
+					<h2 data-i18n="siteCodeTitle">Código de este sitio</h2>
+					<p data-i18n="siteCodeBody">
+						El código fuente de Bedrock Tools está licenciado bajo GPL-3.0.
+					</p>
+					<ul>
+						<li data-i18n="siteCodeRepo">Repositorio: github.com/agentitoe/bedrocktools</li>
+						<li data-i18n="siteCodeLicense">Licencia: GPL-3.0</li>
+					</ul>
+				</div>
+
+				<div class="card">
+					<h2 data-i18n="fontsTitle">Tipografías</h2>
+					<ul>
+						<li data-i18n="fontOutfit">Outfit — licencia SIL Open Font License 1.1</li>
+						<li data-i18n="fontJetbrains">JetBrains Mono — licencia SIL Open Font License 1.1</li>
+						<li data-i18n="fontPress">Press Start 2P — licencia SIL Open Font License 1.1</li>
+						<li data-i18n="fontNoto">Noto Color Emoji — licencia Apache 2.0</li>
+					</ul>
+				</div>
+			</div>
+		</main>
+
+		<footer class="site-footer">
+			<div class="container">
+				<div class="footer-inner">
+					<div>
+						<div class="footer-brand">BEDROCK TOOLS</div>
+						<p class="footer-tagline" data-i18n="footerTagline">
+							Herramientas gratuitas para el ecosistema Minecraft, en Java y Bedrock.
+						</p>
+					</div>
+					<nav class="footer-nav" aria-label="Footer">
+						<div class="footer-col">
+							<span class="footer-heading" data-i18n="footerColProject">Proyecto</span>
+							<a
+								class="footer-link"
+								href="https://github.com/agentitoe/bedrocktools"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-external" /></svg>
+								GitHub
+							</a>
+							<a class="footer-link" href="/licenses">
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-file" /></svg>
+								<span data-i18n="footerLicense">Licencias</span>
+							</a>
+							<a class="footer-link" href="/">
+								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-blocks" /></svg>
+								<span data-i18n="footerAllTools">Todas las herramientas</span>
+							</a>
+						</div>
+					</nav>
+				</div>
+				<div class="footer-bottom">
+					<span data-i18n="copyright">© 2026 AgentitoE</span>
+					<span data-i18n="footerMadeWith">Hecho con ♥ para la comunidad de Minecraft</span>
+				</div>
+			</div>
+		</footer>
+
+		<script type="module">
+			import { initUi } from "/assets/ui.js";
+
+			const translations = {
+				es: {
+					title: "Licencias — Bedrock Tools",
+					skipToContent: "Saltar al contenido",
+					backHome: "Volver al inicio",
+					licensesTitle: "Licencias",
+					licensesSubtitle: "Atribución de los recursos de terceros que usa este sitio.",
+					licensesIntro:
+						"Bedrock Tools no es de su propiedad ni está afiliado a Mojang o Microsoft. Los datos y texturas que usa el sitio proceden de los proyectos de código abierto que se listan aquí; cada uno conserva su licencia y su copyright, y se citan con la atribución que estos proyectos piden.",
+					minecraftAssetsTitle: "Minecraft assets (texturas, modelos y recetas)",
+					minecraftAssetsBody:
+						"Los modelos 3D, texturas y recetas que se descargan durante el build proceden del repositorio InventivetalentDev/minecraft-assets, que empaqueta los assets oficiales de Minecraft. Mojang conserva los derechos sobre el contenido del juego; este sitio no lo redistribuye en producción.",
+					minecraftAssetsRepo: "Repositorio: github.com/InventivetalentDev/minecraft-assets",
+					minecraftAssetsLicense: "Licencia: MIT (ver el archivo LICENSE del repositorio)",
+					geyserTitle: "GeyserMC mapeo de items Java ↔ Bedrock",
+					geyserBody:
+						"El archivo geyser-item-map.json procede del repositorio GeyserMC/mappings y se usa para traducir IDs entre Java y Bedrock.",
+					geyserRepo: "Repositorio: github.com/GeyserMC/mappings",
+					geyserLicense: "Licencia: MIT (ver el archivo LICENSE del repositorio)",
+					siteCodeTitle: "Código de este sitio",
+					siteCodeBody: "El código fuente de Bedrock Tools está licenciado bajo GPL-3.0.",
+					siteCodeRepo: "Repositorio: github.com/agentitoe/bedrocktools",
+					siteCodeLicense: "Licencia: GPL-3.0",
+					fontsTitle: "Tipografías",
+					fontOutfit: "Outfit — licencia SIL Open Font License 1.1",
+					fontJetbrains: "JetBrains Mono — licencia SIL Open Font License 1.1",
+					fontPress: "Press Start 2P — licencia SIL Open Font License 1.1",
+					fontNoto: "Noto Color Emoji — licencia Apache 2.0",
+					footerTagline: "Herramientas gratuitas para el ecosistema Minecraft, en Java y Bedrock.",
+					footerColProject: "Proyecto",
+					footerLicense: "Licencias",
+					footerAllTools: "Todas las herramientas",
+					copyright: "© 2026 AgentitoE",
+					footerMadeWith: "Hecho con ♥ para la comunidad de Minecraft",
+					changeLanguageTitle: "Cambiar idioma",
+					switchToLightTitle: "Cambiar a tema claro",
+					switchToDarkTitle: "Cambiar a tema oscuro",
+				},
+				en: {
+					title: "Licenses — Bedrock Tools",
+					skipToContent: "Skip to content",
+					backHome: "Back to home",
+					licensesTitle: "Licenses",
+					licensesSubtitle: "Attribution for the third-party resources this site uses.",
+					licensesIntro:
+						"Bedrock Tools is not owned by or affiliated with Mojang or Microsoft. The data and textures the site uses come from the open-source projects listed below; each keeps its own license and copyright, and is cited with the attribution those projects ask for.",
+					minecraftAssetsTitle: "Minecraft assets (textures, models and recipes)",
+					minecraftAssetsBody:
+						"The 3D models, textures and recipes downloaded at build time come from the InventivetalentDev/minecraft-assets repository, which packages Minecraft's official assets. Mojang keeps the rights to the game's content; this site does not redistribute it in production.",
+					minecraftAssetsRepo: "Repository: github.com/InventivetalentDev/minecraft-assets",
+					minecraftAssetsLicense: "License: MIT (see the repository's LICENSE file)",
+					geyserTitle: "GeyserMC Java ↔ Bedrock item mapping",
+					geyserBody:
+						"The geyser-item-map.json file comes from the GeyserMC/mappings repository and is used to translate IDs between Java and Bedrock.",
+					geyserRepo: "Repository: github.com/GeyserMC/mappings",
+					geyserLicense: "License: MIT (see the repository's LICENSE file)",
+					siteCodeTitle: "This site's code",
+					siteCodeBody: "Bedrock Tools' source code is licensed under GPL-3.0.",
+					siteCodeRepo: "Repository: github.com/agentitoe/bedrocktools",
+					siteCodeLicense: "License: GPL-3.0",
+					fontsTitle: "Typefaces",
+					fontOutfit: "Outfit — SIL Open Font License 1.1",
+					fontJetbrains: "JetBrains Mono — SIL Open Font License 1.1",
+					fontPress: "Press Start 2P — SIL Open Font License 1.1",
+					fontNoto: "Noto Color Emoji — Apache License 2.0",
+					footerTagline: "Free tools for the Minecraft ecosystem, on Java and Bedrock.",
+					footerColProject: "Project",
+					footerLicense: "Licenses",
+					footerAllTools: "All tools",
+					copyright: "© 2026 AgentitoE",
+					footerMadeWith: "Made with ♥ for the Minecraft community",
+					changeLanguageTitle: "Change language",
+					switchToLightTitle: "Switch to light theme",
+					switchToDarkTitle: "Switch to dark theme",
+				},
+			};
+
+			initUi(translations);
+		</script>
+	</body>
+</html>

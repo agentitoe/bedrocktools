@@ -2,8 +2,13 @@ import type { TranslationTable } from './types';
 
 export const translations: TranslationTable = {
 	es: {
+		skipToContent: "Saltar al contenido",
+		footerColProject: "Proyecto",
+		footerLicense: "Licencias",
+		footerAllTools: "Todas las herramientas",
+		footerMadeWith: "Hecho con ♥ para la comunidad de Minecraft",
 		title: "Items y Bloques — Bedrock Tools",
-		heading: "📦 Items y Bloques de Minecraft",
+		heading: "Items y Bloques de Minecraft",
 		description: "Explora todos los items y bloques disponibles. Haz clic en uno para ver su receta.",
 		searchPlaceholder: "Buscar items y bloques...",
 		noResults: "No se encontraron resultados",
@@ -51,8 +56,13 @@ export const translations: TranslationTable = {
 		copyright: "Hecho con ♥️ por AgentitoE"
 	},
 	en: {
+		skipToContent: "Skip to content",
+		footerColProject: "Project",
+		footerLicense: "Licenses",
+		footerAllTools: "All tools",
+		footerMadeWith: "Made with ♥ for the Minecraft community",
 		title: "Items & Blocks — Bedrock Tools",
-		heading: "📦 Minecraft Items & Blocks",
+		heading: "Minecraft Items & Blocks",
 		description: "Browse all available items and blocks. Click one to see its recipe.",
 		searchPlaceholder: "Search items and blocks...",
 		noResults: "No results found",
