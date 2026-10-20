@@ -56,6 +56,7 @@ export type StructureScan = {
 export type WorkerRequest =
 	| ({ id: number; gen: number; kind: 'tiles' } & SeedVersion & { tiles: TileSpec[] })
 	| ({ id: number; gen: number; kind: 'structures' } & SeedVersion & StructureScan)
+	| ({ id: number; gen: number; kind: 'strongholds' } & SeedVersion & { count: number })
 	| { id: number; gen: number; kind: 'spawn' } & SeedVersion
 	| { id: number; kind: 'reset' } & SeedVersion;
 
@@ -82,6 +83,7 @@ export type StructureHit = {
 export type WorkerResult =
 	| { id: number; gen: number; kind: 'tiles'; results: TileResult[] }
 	| { id: number; gen: number; kind: 'structures'; hits: StructureHit[] }
+	| { id: number; gen: number; kind: 'strongholds'; hits: StructureHit[] }
 	| { id: number; gen: number; kind: 'spawn'; x: number; z: number }
 	| { id: number; kind: 'reset' }
 	| { id: number; kind: 'error'; message: string }

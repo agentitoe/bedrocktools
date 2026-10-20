@@ -52,6 +52,16 @@ export type StructureScanRequest = {
 export type SpawnPoint = { x: number; z: number };
 export type StructurePos = { x: number; z: number };
 
+/** (type, mc) structure configuration slice exposed by ext_get_structure_config. */
+export type StructureConfigValues = {
+	/** Structure salt (matches the catalog provenance table). */
+	salt: number;
+	/** Region size in chunks (the scanner granularity source of truth). */
+	regionSize: number;
+	/** Separation range in chunks (interior attempt span). */
+	chunkRange: number;
+};
+
 /**
  * Shape of the exports Emscripten's MODULARIZE glue exposes for our build
  * (see -sEXPORTED_FUNCTIONS and -sEXPORTED_RUNTIME_METHODS in
@@ -72,6 +82,8 @@ export interface RawCubiomesExports {
 	HEAPU8: Uint8Array;
 	/** Int32 view over linear memory (re-created by the glue on growth). */
 	HEAP32: Int32Array;
+	_ext_find_strongholds(out: number, maxCount: number): number;
+	_ext_get_structure_config(type: number, mc: number, out: number): number;
 }
 
 /** The glue module shape: default export is the (async) module factory. */
@@ -96,6 +108,7 @@ export class BiomesBridge {
 	private scanCap = 0; // capacity in int32 values
 	private scanPtr = 0;
 	private spawnPtr = 0;
+	private configPtr = 0;
 
 	private constructor(module: RawCubiomesExports) {
 		this.module = module;
@@ -169,6 +182,44 @@ export class BiomesBridge {
 		return { x: heap[this.spawnPtr / 4], z: heap[this.spawnPtr / 4 + 1] };
 	}
 
+	/**
+	 * Ring-walks ALL strongholds (vanilla order, up to 128 on 1.18+) with
+	 * accurate biome-checked positions. Strongholds are not region-based, so
+	 * they ride their own call (ext_find_strongholds) instead of the scan
+	 * rectangles of findStructures().
+	 */
+	findStrongholds(maxCount = 128): StructurePos[] {
+		if (maxCount <= 0) throw new BridgeError('einval', 0, 'maxCount');
+		const ptr = this.scanBuffer(maxCount * 2); // (x, z) i32 pairs
+		const n = this.module._ext_find_strongholds(ptr, maxCount);
+		if (n < 0) {
+			this.throwIfNok(n, 'ext_find_strongholds');
+		}
+		const heap = this.module.HEAP32;
+		const hits: StructurePos[] = new Array(n);
+		for (let i = 0; i < n; i++) {
+			hits[i] = { x: heap[ptr / 4 + 2 * i], z: heap[ptr / 4 + 2 * i + 1] };
+		}
+		return hits;
+	}
+
+	/**
+	 * Structure region configuration for one (type, mc) pair: from cubiomes'
+	 * getStructureConfig — the numbers the typed catalog asserts against
+	 * (region granularity of the scanner and the 1.18+-era region sizes).
+	 */
+	getStructureConfig(type: number, mc: number): StructureConfigValues {
+		this.ensureConfigBuffer();
+		const rc = this.module._ext_get_structure_config(type, mc, this.configPtr);
+		this.throwIfNok(rc, 'ext_get_structure_config');
+		const heap = this.module.HEAP32;
+		return {
+			salt: heap[this.configPtr / 4],
+			regionSize: heap[this.configPtr / 4 + 1],
+			chunkRange: heap[this.configPtr / 4 + 2],
+		};
+	}
+
 	private throwIfNok(rc: number, context: string): void {
 		if (rc === 0) return;
 		const code = rc >= 0 ? 'egen' : rc === -1 ? 'einval' : rc === -2 ? 'ecache' : rc === -3 ? 'enomem' : 'egen';
@@ -202,6 +253,14 @@ export class BiomesBridge {
 		if (this.spawnPtr === 0) {
 			this.spawnPtr = this.module._malloc(8);
 			if (this.spawnPtr === 0) throw new BridgeError('enomem', 0, 'spawn buffer');
+		}
+	}
+
+	/** Fixed-sized (3 i32) configuration buffer, used once per request. */
+	private ensureConfigBuffer(): void {
+		if (this.configPtr === 0) {
+			this.configPtr = this.module._malloc(12);
+			if (this.configPtr === 0) throw new BridgeError('enomem', 0, 'structure config buffer');
 		}
 	}
 }

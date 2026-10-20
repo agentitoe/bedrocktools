@@ -26,7 +26,10 @@ import { asSeed64 } from './wasm/seed64';
 import { buildPalette, biomeCssColor, defaultPalette, type Palette } from './biome-colors';
 import { MapView } from './map-view';
 import { MapRenderer, type CanvasLike, type Marker } from './map-renderer';
+import { StructureScanner } from './structures/scanner';
+import { STRUCTURE_CATALOG, structuresForMc } from './structures/catalog';
 import type { ViewEvent } from './map-view';
+import type { WorldRect } from './types';
 import type { SeedVersion } from './workers/protocol';
 
 export type SeedMapState = {
@@ -43,6 +46,10 @@ export type SeedMapHandle = {
 	setState(state: SeedMapState): Promise<void>;
 	/** Overlay markers (structures/spawn); repainted within one frame. */
 	setMarkers(markers: Marker[]): void;
+	/** Toggle structure types (client-side filter, no rescan). */
+	setStructuresEnabled(ids: string[]): void;
+	/** Marker pick callback (click via renderer hitTest; tooltips arrive in E6). */
+	onMarkerPick(handler: (marker: Marker | null) => void): void;
 	/** Toggle the legend strip visibility. */
 	setLegendVisible(visible: boolean): void;
 	dispose(): Promise<void>;
@@ -101,6 +108,30 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 		console.warn('[seed-map] tile error:', message);
 	});
 
+	// Seed/version/dimension currently driving scans & catalog filtering.
+	let currentState: SeedVersion | null = null;
+	/** User toggle state: ids the user turned OFF (all default to on). */
+	let disabledIds = new Set<string>();
+
+	// The structure relay shares the pool: debounced scans + hit decanting.
+	const scanner = new StructureScanner({ pool });
+	const unsubScanner = scanner.onMarkersChanged((entries) => {
+		// Structure hits -> overlay markers with per-variety catalog styling.
+		// The spawn marker shares the overlay; the renderer dedups by id.
+		const spawn = renderer.markers.find((m) => m.id === 'spawn');
+		const structureMarkers: Marker[] = entries
+			.filter((entry) => !disabledIds.has(entry.structureId))
+			.map((entry): Marker => ({
+				id: entry.id,
+				x: entry.x,
+				z: entry.z,
+				iconRadius: 7,
+				label: entry.label,
+				color: entry.color,
+			}));
+		renderer.setMarkers((spawn ? [spawn] : []).concat(structureMarkers));
+	});
+
 	let adjustGuard = 0;
 	view.onViewChange((event) => {
 		renderer.onViewChange(event);
@@ -109,6 +140,8 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 			try {
 				// Viewport->manager only; renderer never reschedules generation.
 				manager.setViewport({ rect: event.rect, scale: event.scale });
+				// The structure relay shares the view (debounced, pool-batched).
+				scanner.onScrollView(event.rect);
 			} finally {
 				adjustGuard--;
 			}
@@ -127,6 +160,20 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 		view.syncSizes();
 	});
 
+	// Marker pick: overlay click routes through the renderer hit-test and the
+	// catalog selectors light the picked marker (tooltips/status land in E6).
+	const pickHandlers = new Set<(marker: Marker | null) => void>();
+	const onOverlayClick = (event: MouseEvent) => {
+		const bounds = overlayCanvas.getBoundingClientRect();
+		const marker = renderer.hitTest(event.clientX - bounds.left, event.clientY - bounds.top);
+		const previous = renderer.markers.find((m) => m.selected);
+		if (previous !== undefined) previous.selected = false;
+		if (marker !== null) marker.selected = true;
+		renderer.setMarkers(renderer.markers); // re-paint with the new highlight
+		for (const handler of pickHandlers) handler(marker);
+	};
+	overlayCanvas.addEventListener('click', onOverlayClick);
+
 	return {
 		async setState({ seed, version = DEFAULT_VERSION, dim = 0 }: SeedMapState & { version?: number; dim?: number }) {
 			const seedValue = asSeed64(seed); // validates the u64 range at the border
@@ -135,6 +182,14 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 			// Refresh the viewport request against the NEW state.
 			const rect = view.visibleRect();
 			manager.setViewport({ rect, scale: view.lodScale() });
+			// Structure relay: feed world state + version-filtered catalog.
+			currentState = { seed: seedValue, version, dim };
+			scanner.setEnabled(
+				structuresForMc(version)
+					.filter((entry) => !disabledIds.has(entry.id))
+					.map((entry) => entry.id),
+			);
+			scanner.setWorldState(currentState);
 			emitSpawn(pool, seedValue, version, dim);
 			// The spawn fetch is best-effort: on error the pool emits it; the
 			// previous marker stays hidden until the next successful query.
@@ -142,12 +197,28 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 		setMarkers(markers) {
 			renderer.setMarkers(markers);
 		},
+		setStructuresEnabled(ids) {
+			disabledIds = new Set(STRUCTURE_CATALOG.filter((e) => !ids.includes(e.id)).map((e) => e.id));
+			if (currentState !== null) {
+				scanner.setEnabled(
+					structuresForMc(currentState.version)
+						.filter((entry) => !disabledIds.has(entry.id))
+						.map((entry) => entry.id),
+				);
+			}
+		},
+		onMarkerPick(handler) {
+			pickHandlers.add(handler);
+		},
 		setLegendVisible(visible) {
 			legend.style.display = visible ? '' : 'none';
 		},
 		async dispose() {
+			overlayCanvas.removeEventListener('click', onOverlayClick);
 			unbindView();
 			unsubPool();
+			unsubScanner();
+			scanner.dispose();
 			manager.dispose();
 			await pool.dispose();
 			stack.remove();

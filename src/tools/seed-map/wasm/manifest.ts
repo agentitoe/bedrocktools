@@ -35,8 +35,8 @@ export const WASM_MODULES: Record<WasmModuleId, WasmModuleManifest> = {
 		id: 'biomes',
 		glueUrl: WASM_BASE + 'biomes-java-gen.mjs',
 		sha256: {
-			glue: '6a6b4920973bce760a641dc1d888232e7dee9b3141bea606c4b972f02a03af61',
-			wasm: '01f315df64156283cc7b38504e4685413dd41f80143ace90c2bcc596d57534e5',
+			glue: '34610699acb4e08be57cea4f992641e9a311ba3712af65283d764ff7f5b34bd1',
+			wasm: '5c838593c059a74c4051bd0174dfe45cf4b5cee0976a85c2e1c8319dcd3784ba',
 		},
 	},
 	bedrock: {

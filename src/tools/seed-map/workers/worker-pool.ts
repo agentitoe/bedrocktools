@@ -36,6 +36,7 @@
 import { splitSeed, type Seed64 } from '../wasm/seed64';
 import type {
 	SeedVersion,
+	StructureHit,
 	StructureScan,
 	TileResult,
 	WorkerCancel,
@@ -57,12 +58,14 @@ export interface WorkerLike {
 export type PoolBatch =
 	| { kind: 'tiles'; gen: number; state: SeedVersion; tiles: { x: number; z: number; scale: number }[] }
 	| { kind: 'structures'; gen: number; state: SeedVersion; scans: StructureScan[] }
+	| { kind: 'strongholds'; gen: number; state: SeedVersion; count: number }
 	| ({ kind: 'spawn'; gen: number } & SeedVersion);
 
 /** What the map layer receives per finished/discarded task. */
 export type PoolResult =
 	| { batchId: number; gen: number; kind: 'tiles'; tile: TileResult }
-	| { batchId: number; gen: number; kind: 'structures'; scan: StructureScan; hits: { x: number; z: number }[] }
+	| { batchId: number; gen: number; kind: 'structures'; scan: StructureScan; hits: StructureHit[] }
+	| { batchId: number; gen: number; kind: 'strongholds'; hits: StructureHit[] }
 	| { batchId: number; gen: number; kind: 'spawn'; x: number; z: number }
 	| { batchId: number; gen: number; kind: 'cancelled' }
 	| { batchId: number; gen: number; kind: 'error'; message: string };
@@ -386,7 +389,8 @@ export class WorkerPool {
 				break;
 			case 'structures': {
 				// One request == one scan; the exact scan is recoverable from
-				// the request that carried the id.
+				// the request that carried the id. Hits arrive type-stamped
+				// from the worker (or via the scan for defense in depth).
 				const hitScan: StructureScan = task.request.kind === 'structures'
 					? { type: task.request.type, region: task.request.region, flags: task.request.flags }
 					: { type: 0, region: { x0: 0, z0: 0, w: 0, h: 0 }, flags: 0 };
@@ -395,10 +399,17 @@ export class WorkerPool {
 					gen: task.gen,
 					kind: 'structures',
 					scan: hitScan,
-					hits: result.hits,
+					hits: result.hits.map((h) => ({
+						type: h.type !== undefined ? h.type : hitScan.type,
+						x: h.x,
+						z: h.z,
+					})),
 				});
 				break;
 			}
+			case 'strongholds':
+				this.emit({ batchId: task.batchId, gen: task.gen, kind: 'strongholds', hits: result.hits });
+				break;
 			case 'spawn':
 				this.emit({ batchId: task.batchId, gen: task.gen, kind: 'spawn', x: result.x, z: result.z });
 				break;

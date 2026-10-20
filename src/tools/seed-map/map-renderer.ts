@@ -60,6 +60,8 @@ export type Marker = {
 	iconRadius: number;
 	label?: string;
 	selected?: boolean;
+	/** Per-variety fill (structure catalog); single style falls back. */
+	color?: string;
 };
 
 export type MarkerStyle = { background: string; text: string };
@@ -383,7 +385,9 @@ export class MapRenderer {
 			const r = marker.iconRadius;
 			ctx.beginPath();
 			ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
-			ctx.fillStyle = marker.selected ? this.markerStyle.text : this.markerStyle.background;
+			ctx.fillStyle = marker.selected
+				? this.markerStyle.text
+				: (marker.color ?? this.markerStyle.background);
 			ctx.fill();
 			if (marker.label !== undefined && r >= 6) {
 				ctx.fillStyle = this.markerStyle.text;

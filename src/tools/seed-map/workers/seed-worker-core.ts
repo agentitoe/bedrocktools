@@ -9,6 +9,7 @@
  */
 
 import type { BiomeTileRequest, SpawnPoint, StructurePos, StructureScanRequest } from '../wasm/bridge';
+import { STRUCTURE_STRONGHOLD } from '../structures/catalog';
 import { asSeed64, sameSeed, type Seed64 } from '../wasm/seed64';
 import type {
 	SeedVersion,
@@ -30,6 +31,7 @@ export interface WorkerBridge {
 	reset(seed: bigint | Seed64, version: number, dim: number, flags?: number): void;
 	genTile(req: BiomeTileRequest, out: Uint8ClampedArray | Uint8Array): void;
 	findStructures(req: StructureScanRequest): StructurePos[];
+	findStrongholds(count: number): StructurePos[];
 	getSpawn(): SpawnPoint;
 }
 
@@ -119,6 +121,17 @@ export class SeedWorkerCore {
 					case 'spawn': {
 						const spawn = bridge.getSpawn();
 						return [{ id: msg.id, gen: msg.gen, kind: 'spawn', x: spawn.x, z: spawn.z }];
+					}
+					case 'strongholds': {
+						// Ring-walk (ext_find_strongholds); the worker stamps the
+						// hits with the Stronghold enum of the pinned submodule.
+						const hits = bridge.findStrongholds(msg.count);
+						return [{
+							id: msg.id,
+							gen: msg.gen,
+							kind: 'strongholds',
+							hits: hits.map((h) => ({ type: STRUCTURE_STRONGHOLD, x: h.x, z: h.z })),
+						}];
 					}
 				}
 			} catch (err) {

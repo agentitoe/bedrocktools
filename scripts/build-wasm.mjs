@@ -58,7 +58,7 @@ const moduleFlagGroups = {
 		"-sWASM_ASYNC_COMPILATION=0",
 		"-sSTACK_SIZE=2097152", // cubiomes recurses through the layer stack / noise octaves
 		"--no-entry",
-		"-sEXPORTED_FUNCTIONS=[_ext_set_seed,_ext_gen_biome_tile,_ext_find_structures,_ext_get_spawn,_ext_ensure_cache,_malloc,_free]",
+		"-sEXPORTED_FUNCTIONS=[_ext_set_seed,_ext_gen_biome_tile,_ext_find_structures,_ext_find_strongholds,_ext_get_structure_config,_ext_get_spawn,_ext_ensure_cache,_malloc,_free]",
 		// Heap views are exposed for zero-copy buffers; the JS bridge allocates
 		// once per worker and reuses the views (HEAP32 = Int32Array over the
 		// heap, HEAPU8 = Uint8Array).

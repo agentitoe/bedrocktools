@@ -205,3 +205,58 @@ int ext_get_spawn(int32_t *out_xy)
 	out_xy[1] = p.z;
 	return EXT_OK;
 }
+
+int ext_find_strongholds(int32_t *out, int max_count)
+{
+	StrongholdIter sh;
+	int n = 0, remaining;
+
+	if (!g_seeded || out == NULL)
+		return EXT_EINVAL;
+	if (g_gen.dim != DIM_OVERWORLD)
+		return EXT_EINVAL;
+	/* initFirstStronghold + one nextStronghold must not overrun the buffer
+	 * downstream: max_count bounds the emit path below. */
+	if (max_count <= 0)
+		return EXT_EINVAL;
+
+	/* Vanilla semantics: the iterator carries the approximate anchors; each
+	 * nextStronghold() resolves the CURRENT approximate into an accurate,
+	 * biome-checked position (sh.pos) and prepares the next approximation.
+	 * 1.18+ iterates exactly 128 ring positions; pre-1.9 supports 3 and
+	 * pre-B1_8 gives 0 (naturally bounded loop). */
+	initFirstStronghold(&sh, g_gen.mc, (uint64_t)g_gen.seed);
+	do
+	{
+		remaining = nextStronghold(&sh, &g_gen);
+		/* The return value counts the remaining entries AFTER this one;
+		 * a bogus index-128 result reports 0 and is skipped (it only
+		 * advanced the RNG state). */
+		if (remaining <= 0)
+			break;
+		if (n < max_count)
+		{
+			out[2 * n] = sh.pos.x;
+			out[2 * n + 1] = sh.pos.z;
+			n++;
+		}
+	} while (remaining > 0 && n < max_count);
+	/* Stopping at the cap is safe: later positions are full ring entries and
+	 * not affected by whether previous ones were emitted (the iterator keeps
+	 * its own state). */
+	return n;
+}
+
+int ext_get_structure_config(int structure_type, int mc, int32_t *out)
+{
+	StructureConfig sconf;
+
+	if (out == NULL)
+		return EXT_EINVAL;
+	if (!getStructureConfig(structure_type, mc, &sconf))
+		return EXT_ENOTSUP;
+	out[0] = (int32_t)sconf.salt;
+	out[1] = (int32_t)sconf.regionSize;
+	out[2] = (int32_t)sconf.chunkRange;
+	return EXT_OK;
+}

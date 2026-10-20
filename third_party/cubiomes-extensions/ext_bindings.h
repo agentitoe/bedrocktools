@@ -41,6 +41,7 @@ enum {
 	EXT_ECACHE = -2, /* growing the internal generation cache failed or is forbidden */
 	EXT_ENOMEM = -3, /* allocation failure inside ext_ensure_cache */
 	EXT_EGEN = -4,   /* cubiomes generation step failed (genBiomes returned non-zero) */
+	EXT_ENOTSUP = -5, /* type/version has no structure config (additive, E4) */
 };
 
 /*
@@ -112,9 +113,11 @@ int ext_gen_biome_tile(int scale, int32_t x, int32_t z, int w, int h, uint8_t *o
  * guarantees the scan writes out of bounds never. Note that the number of
  * *valid* positions can be smaller.
  *
- * Stronghold is handled by getStructurePos itself (approximate anchor per
- * region); its real iteration lives in finders.c's StrongholdIter and is
- * not exposed through this narrow API.
+ * Stronghold does NOT pass through here: getStructurePos() has no Stronghold
+ * case (the config lookup fails first and yields 0 hits). Strongholds are
+ * ring-based, not region-based, and are exposed by ext_find_strongholds()
+ * below. Note that getStructurePos()'s default branch ends in exit(-1), so
+ * callers must never pass unsupported types here anyway.
  *
  * Returns the number of positions written (>= 0), or a negative code.
  *
@@ -123,6 +126,41 @@ int ext_gen_biome_tile(int scale, int32_t x, int32_t z, int w, int h, uint8_t *o
  */
 int ext_find_structures(int structure_type, int reg_x0, int reg_z0, int reg_w,
 	int reg_h, uint32_t flags, int32_t *out, int out_cap);
+
+/*
+ * Strongholds are the one Overworld structure that is NOT region-based:
+ * vanilla walks up to 128 ring-anchored positions with radial layout RNG
+ * (finders.c StrongholdIter). this wrapper drives that iterator against the
+ * currently seeded generator (ext_set_seed)
+ *
+ * Writes up to max_count stronghold positions as (x, z) i32 pairs into
+ * `out`; out[2*n] accurate (biome-checked) locations in generation order —
+ * which is NOT nearest-first. The generator must be seeded for the
+ * Overworld; each iteration runs a fairly heavy locateBiome, so 128 is the
+ * practical cap for scanner batches.
+ *
+ * Returns the number of positions written (>= 0), or a negative code.
+ * Additive ABI (E4): extends the frozen set without breaking the signatures.
+ *
+ * JS ABI: (i32 maxCount, i32 outPtr) -> i32
+ */
+int ext_find_strongholds(int32_t *out, int max_count);
+
+/*
+ * Reads the structure configuration of one type for one version into
+ * `out` (packed as out[0] = salt i32, out[1] = regionSize i32,
+ * out[2] = chunkRange i32), straight from cubiomes' getStructureConfig().
+ * Lets the typed catalog (src/tools/seed-map/structures/) assert that its
+ * hardcoded region granularity matches the submodule pin — catch config
+ * drift between catalog and submodule, not a runtime dependency.
+ *
+ * Returns EXT_OK on success. Returns EXT_EINVAL on a bad pointer argument
+ * and EXT_ENOTSUP (see enum below) when getStructureConfig returns 0 for
+ * the (type, mc) pair — i.e. the type does not exist in that version.
+ *
+ * JS ABI: (i32 type, i32 mc, i32 outPtr) -> i32
+ */
+int ext_get_structure_config(int structure_type, int mc, int32_t *out);
 
 /*
  * Writes the world spawn point of the current generator into out_xy

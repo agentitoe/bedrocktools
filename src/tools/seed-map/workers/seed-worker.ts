@@ -16,7 +16,7 @@ import { WASM_MODULES } from '../wasm/manifest';
 import { SeedWorkerCore } from './seed-worker-core';
 import type { WorkerInbound, WorkerResult } from './protocol';
 
-/** The env whose glue the worker serves; the bedrock module joins in E4. */
+/** The env whose glue the worker serves; the Bedrock module joins in E5. */
 const BIOMES_MODULE = WASM_MODULES.biomes;
 
 const core = new SeedWorkerCore(() => BiomesBridge.load(BIOMES_MODULE.glueUrl));
