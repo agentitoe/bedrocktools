@@ -62,6 +62,38 @@ function findToolDirs() {
 		});
 }
 
+// Worker entrypoints do not require an index.ts yet: a tool under
+// construction (e.g. seed-map) can already ship its workers. Every
+// src/tools/<slug>/workers/*.ts compiles to public/tools/<slug>/<name>.js.
+async function buildToolWorkers() {
+	for (const name of readdirSync(srcToolsDir)) {
+		const toolDir = join(srcToolsDir, name);
+		if (name === "_template" || !statSync(toolDir).isDirectory()) continue;
+		const workersDir = join(toolDir, "workers");
+		if (!existsSync(workersDir)) continue;
+
+		// Only *-worker.ts files are worker entrypoints; the other files in
+		// workers/ are shared modules that get bundled into the entries.
+		const entries = readdirSync(workersDir)
+			.filter((f) => f.endsWith("-worker.ts"))
+			.map((f) => join(workersDir, f));
+		if (entries.length === 0) continue;
+
+		mkdirSync(join(outDir, name), { recursive: true });
+		console.log("Building workers for " + name + "...");
+		const result = await Bun.build({
+			entrypoints: entries,
+			outdir: join(outDir, name),
+			naming: { entry: "[name].[ext]" },
+			...commonBuildOptions,
+		});
+		if (!result.success) {
+			for (const log of result.logs) console.error(log);
+			throw new Error(`Worker build failed for ${name}`);
+		}
+	}
+}
+
 async function gatherManifests() {
 	const toolNames = findToolDirs();
 	const manifests = [];
@@ -95,6 +127,7 @@ async function gatherManifests() {
 
 async function main() {
 	await buildSharedUi();
+	await buildToolWorkers();
 
 	const toolNames = findToolDirs();
 
