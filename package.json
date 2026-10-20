@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "bun scripts/build.mjs && bun scripts/fetch-fonts.mjs && bun scripts/extract-data.mjs && bun scripts/translate-items.mjs && bun scripts/fetch-geyser-mappings.mjs",
+    "build:wasm": "bun scripts/build-wasm.mjs",
     "build:fonts": "bun scripts/fetch-fonts.mjs",
     "build:og": "bun scripts/build-og.mjs",
     "typecheck": "tsc --noEmit",
