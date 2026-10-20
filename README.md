@@ -65,6 +65,7 @@ Open [http://localhost:8788/](http://localhost:8788/) — or `PORT=3000 bun run 
 | Command          | Purpose                                                                            |
 | ---------------- | ---------------------------------------------------------------------------------- |
 | `bun run build`  | Rebuilds the bundles **and** regenerates the Minecraft data (slow, needs network). |
+| `bun run build:wasm` | Rebuilds the WebAssembly modules for the Seed Map tool (needs Emscripten).     |
 | `bun run dev`    | Build, then serve locally.                                                         |
 | `bun run deploy` | Push `public/` to Cloudflare Pages.                                                |
 
@@ -83,6 +84,21 @@ bun scripts/build.mjs && bun scripts/serve.mjs
 5. **`scripts/fetch-geyser-mappings.mjs`** — refreshes the Java↔Bedrock id map.
 
 `public/data/`, `public/textures/` and `public/fonts/` live in git, so a clean clone runs out of the box. The bundles and the manifest are git-ignored and rebuilt on demand.
+
+### WebAssembly (Seed Map)
+
+The Seed Map tool computes biomes with [cubiomes](https://github.com/xpple/cubiomes), an actively maintained fork of Cubitect's cubiomes (MIT), vendored as the `third_party/cubiomes` submodule and compiled to WebAssembly into `public/wasm/`.
+
+The compiled `.wasm` artifacts and their glue `.mjs` modules are committed, so building or running the site does **not** require `git clone --recursive` and does **not** require Emscripten. `third_party/cubiomes/` sits next to them for provenance only: pin it, update it, recompile and commit the new artifacts — you rarely need it locally.
+
+`bun scripts/build-wasm.mjs` (or `bun run build:wasm`) recompiles both modules ([Emscripten](https://emscripten.org) required):
+
+1. **`biomes-java-gen.wasm`** — the cubiomes engine plus the narrow `third_party/cubiomes-extensions` bindings.
+2. **`bedrock-structures.wasm`** — a `br_find` placeholder until the real Bedrock RNG module lands.
+
+It also rewrites `public/wasm/checksums.json` (SHA-256 per artifact) and, at startup, verifies existing artifacts against it: a corrupted `.wasm` fails the build. Delete the corrupted file or pass `--force` to regenerate.
+
+The submodule pin is not part of the normal build pipeline — treat `public/wasm/` as the source of truth, like `public/data/`.
 
 ### Design system
 
@@ -122,7 +138,11 @@ public/
   assets/              shared styles, favicon, generated ui.js / app.js
   data/                generated JSON (committed)
   textures/            generated WebP (committed)
+  wasm/                compiled WebAssembly artifacts (committed)
   tools/<slug>/        each tool's page and bundle.js
+third_party/
+  cubiomes/            git submodule pinned to xpple/cubiomes (MIT)
+  cubiomes-extensions/ our C99 bindings layered on cubiomes (compiled into public/wasm/)
 ```
 
 ## Languages

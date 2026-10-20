@@ -1,0 +1,3 @@
+[submodule "third_party/cubiomes"]
+	path = third_party/cubiomes
+	url = https://github.com/xpple/cubiomes.git

@@ -1,0 +1,2 @@
+# Binary wasm artifacts must not be touched by line-ending conversion.
+*.wasm binary
