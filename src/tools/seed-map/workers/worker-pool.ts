@@ -327,6 +327,19 @@ export class WorkerPool {
 				};
 				this.enqueue(request, batchId, batch.gen);
 			}
+		} else if (batch.kind === 'strongholds') {
+			// One ring walk per batch; the dedicated kind exists because
+			// getStructurePos() has no Stronghold case (ext_bindings.h).
+			const request: WorkerRequest = {
+				id: 0,
+				gen: batch.gen,
+				kind: 'strongholds',
+				seed,
+				version,
+				dim,
+				count: batch.count,
+			};
+			this.enqueue(request, batchId, batch.gen);
 		} else {
 			const request: WorkerRequest = { id: 0, gen: batch.gen, kind: 'spawn', seed, version, dim };
 			this.enqueue(request, batchId, batch.gen);

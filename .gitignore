@@ -12,3 +12,4 @@ bun.lock
 .test-dist
 .freebuff/
 .opencode/
+tests/fixtures/build/

@@ -224,3 +224,56 @@ test('stale batches are cancelled at once and disposed pools reject submissions'
 	// dispose must have terminated the worker.
 	expect(mocks[0].isTerminated()).toBe(true);
 });
+
+test('strongholds batches dispatch one request and propagate the stamped hits', () => {
+	const mocks: Mock[] = [];
+	const pool = new WorkerPool({ size: 1, createWorker: () => { const m = makeMock(); mocks.push(m); return m.worker; } });
+	const got: PoolResult[] = [];
+	pool.onResult((r) => got.push(r));
+
+	const batchId = pool.submit({ kind: 'strongholds', gen: 1, state: STATE, count: 128 });
+	// One request for the whole ring walk (the in-flight cap sees ONE task).
+	expect(mocks[0].sent).toHaveLength(1);
+	const request = mocks[0].sent[0] as Extract<WorkerInbound, { kind: 'strongholds' }>;
+	expect(request).toEqual({
+		id: 1, gen: 1, kind: 'strongholds',
+		seed: STATE.seed, version: 32, dim: 0, count: 128,
+	});
+	expect(batchId).toBe(1);
+
+	// The worker stamps hits with the Stronghold enum; the pool propagates
+	// them exactly once, correlated with the batch id.
+	mocks[0].push({
+		id: 1, gen: 1, kind: 'strongholds',
+		hits: [{ type: 27, x: -204, z: -1692 }, { type: 27, x: 2004, z: 916 }],
+	});
+	expect(got).toEqual([{
+		batchId: 1, gen: 1, kind: 'strongholds',
+		hits: [{ type: 27, x: -204, z: -1692 }, { type: 27, x: 2004, z: 916 }],
+	}]);
+	expect(pool.pendingCount).toBe(0);
+	pool.dispose();
+});
+
+test('a cancelled strongholds batch hands the flying ids to the worker; racing results still deliver', () => {
+	const mocks: Mock[] = [];
+	const pool = new WorkerPool({ size: 1, createWorker: () => { const m = makeMock(); mocks.push(m); return m.worker; } });
+	const got: PoolResult[] = [];
+	pool.onResult((r) => got.push(r));
+
+	// Single-request batch: it is FLYING when cancelled (no queued task to
+	// settle locally), so the pool only hands the ids to the worker.
+	pool.submit({ kind: 'strongholds', gen: 1, state: STATE, count: 128 });
+	mocks[0].sent.length = 0;
+	pool.cancelBatch(1);
+	expect(got).toEqual([]);
+	expect(mocks[0].sent).toEqual([{ type: 'cancel', ids: [1] }]);
+
+	// Flying tasks of the batch deliver normally — a result that raced the
+	// cancel arrives exactly once, the duplicate after settling is dropped.
+	mocks[0].push({ id: 1, gen: 1, kind: 'strongholds', hits: [{ type: 27, x: 1, z: 2 }] });
+	expect(got).toEqual([{ batchId: 1, gen: 1, kind: 'strongholds', hits: [{ type: 27, x: 1, z: 2 }] }]);
+	mocks[0].push({ id: 1, gen: 1, kind: 'strongholds', hits: [{ type: 27, x: 1, z: 2 }] });
+	expect(got).toHaveLength(1);
+	pool.dispose();
+});

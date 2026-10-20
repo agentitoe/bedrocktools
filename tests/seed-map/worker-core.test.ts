@@ -27,6 +27,8 @@ class MockBridge implements WorkerBridge {
 	reseeds: { seed: { hi: number; lo: number }; version: number; dim: number }[] = [];
 	tileCalls: BiomeTileRequest[] = [];
 	scans: StructureScanRequest[] = [];
+	strongholdCalls: number[] = [];
+	strongholdHits: StructurePos[] = [];
 	spawnCalls = 0;
 	failTiles = false;
 
@@ -47,6 +49,11 @@ class MockBridge implements WorkerBridge {
 	findStructures(req: StructureScanRequest): StructurePos[] {
 		this.scans.push(req);
 		return [{ x: 544, z: 352 }];
+	}
+
+	findStrongholds(count: number): StructurePos[] {
+		this.strongholdCalls.push(count);
+		return this.strongholdHits;
 	}
 
 	getSpawn(): SpawnPoint {
@@ -130,6 +137,39 @@ test('bridge failures surface as error results for the request id', async () => 
 	const core = new SeedWorkerCore(async () => bridge, { w: 4, h: 2 });
 	const results = await drained(core, { id: 11, gen: 1, kind: 'tiles', ...STATE, tiles: [{ x: 0, z: 0, scale: 1 }] });
 	expect(results).toEqual([{ id: 11, kind: 'error', message: 'gen failed' }]);
+});
+
+test('strongholds request ring-walks the bridge and re-stamps hits as 27', async () => {
+	const bridge = new MockBridge();
+	bridge.strongholdHits = [{ x: -204, z: -1692 }, { x: 2004, z: 916 }];
+	const core = new SeedWorkerCore(async () => bridge, { w: 4, h: 2 });
+	const results = await drained(core, { id: 20, gen: 3, kind: 'strongholds', ...STATE, count: 128 });
+
+	// The bridge receives the EXACT requested cap and returns raw coords.
+	expect(bridge.strongholdCalls).toEqual([128]);
+	// The worker stamps EVERY hit with the pinned Stronghold enum (27):
+	// the bridge deliberately returns coordinates only.
+	expect(results).toEqual([{
+		id: 20,
+		gen: 3,
+		kind: 'strongholds',
+		hits: [
+			{ type: 27, x: -204, z: -1692 },
+			{ type: 27, x: 2004, z: 916 },
+		],
+	}]);
+});
+
+test('strongholds re-applies a mismatched world state before the ring walk', async () => {
+	const bridge = new MockBridge();
+	bridge.strongholdHits = [{ x: 1156, z: 5124 }];
+	const core = new SeedWorkerCore(async () => bridge, { w: 4, h: 2 });
+	const other: SeedVersion = { seed: { hi: 1901, lo: 560071542 }, version: 25, dim: 0 };
+	await core.handle({ id: 21, kind: 'reset', ...STATE });
+	await drained(core, { id: 22, gen: 1, kind: 'strongholds', ...other, count: 16 });
+	expect(bridge.strongholdCalls).toEqual([16]);
+	expect(bridge.reseeds).toHaveLength(2);
+	expect(bridge.reseeds[1]).toEqual({ seed: other.seed, version: 25, dim: 0 });
 });
 
 test('seed mismatch mid-flight re-applies the state (no biome mixing)', async () => {
