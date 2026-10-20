@@ -2,6 +2,7 @@ node_modules
 .claude/
 .wrangler
 public/tools/*/bundle.js
+public/tools/*/seed-worker.js
 public/assets/ui.js
 *.log
 package-lock.json
