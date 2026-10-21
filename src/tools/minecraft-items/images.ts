@@ -9,32 +9,8 @@
 
 import type { ItemData } from './types';
 import { getItemName, getTextureFallbacks } from './data';
+import { attachTextureFallbacks } from '../../shared/mc-render/texture-fallbacks';
 import { createIconElement } from '../../shared/mc-render/icons';
-
-/**
- * Keep the tool's texture fallback chain working on the flat placeholder the
- * shared factory returns: `/data/items.json` sometimes points at a texture
- * variant that is not on disk, and the candidate list ends in a placeholder
- * SVG. Baked atlas sprites are left untouched (their URL is never a candidate).
- */
-function attachTextureFallbacks(icon: HTMLCanvasElement | HTMLImageElement, candidates: string[]): void {
-	if (!(icon instanceof HTMLImageElement)) return;
-	const image: HTMLImageElement = icon;
-
-	const current = image.getAttribute('src') ?? '';
-	if (current.length > 0 && !candidates.includes(current)) return;
-
-	let index = candidates.indexOf(current);
-	if (index < 0) index = 0;
-	image.onerror = () => {
-		index++;
-		if (index < candidates.length) {
-			image.src = candidates[index];
-		} else {
-			image.onerror = null;
-		}
-	};
-}
 
 /** Copy a rendered canvas, so a caller can never mutate a shared cache entry. */
 export function cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {

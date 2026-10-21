@@ -8,6 +8,7 @@
 
 import type { ItemData } from './types';
 import { createIconElement } from '../../shared/mc-render/icons';
+import { attachTextureFallbacks } from '../../shared/mc-render/texture-fallbacks';
 
 const PLACEHOLDER_SVG = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22 viewBox=%220 0 48 48%22%3E%3Crect fill=%22%2366%22 width=%2248%22 height=%2248%22/%3E%3Ctext x=%2250%25%22 y=%2255%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2214%22 font-family=%22monospace%22%3E?%3C/text%3E%3C/svg%3E";
 
@@ -43,30 +44,6 @@ export function getTextureFallbacks(item: ItemData): string[] {
 
 	fallbacks.push(PLACEHOLDER_SVG);
 	return fallbacks;
-}
-
-/**
- * Keep the tool's texture fallback chain working on the flat placeholder the
- * shared factory returns. Baked atlas sprites are left untouched (their URL is
- * never one of the candidates).
- */
-function attachTextureFallbacks(icon: HTMLCanvasElement | HTMLImageElement, candidates: string[]): void {
-	if (!(icon instanceof HTMLImageElement)) return;
-	const image: HTMLImageElement = icon;
-
-	const current = image.getAttribute('src') ?? '';
-	if (current.length > 0 && !candidates.includes(current)) return;
-
-	let index = candidates.indexOf(current);
-	if (index < 0) index = 0;
-	image.onerror = () => {
-		index++;
-		if (index < candidates.length) {
-			image.src = candidates[index];
-		} else {
-			image.onerror = null;
-		}
-	};
 }
 
 /**

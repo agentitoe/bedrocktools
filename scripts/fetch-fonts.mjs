@@ -42,7 +42,7 @@ function parseFontFaces(css) {
 		const subset = match[1];
 		const body = match[2];
 		const src = /src:\s*url\(([^)]+)\)/.exec(body);
-		const range = /unicode-range:\s*([^;]+);/.exec(body);
+		const range = /unicode-range:([^;]+);/.exec(body);
 		if (!src) continue;
 		blocks.push({
 			subset,

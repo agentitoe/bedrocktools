@@ -11,16 +11,27 @@
 //
 // Usage: bun scripts/build-og.mjs [outputPath]
 //   (writes PNG bytes to the path given, or public/assets/og.png by default)
-import { spawn } from "child_process";
-import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
+import { spawn } from "node:child_process";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join, dirname, resolve, relative, isAbsolute } from "node:path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const source = join(root, "public", "assets", "og.html");
-const out = process.argv[2] ? join(root, process.argv[2]) : join(root, "public", "assets", "og.png");
+// Output path is CLI-supplied: clamp it inside the repo root so a stray
+// argument can never escape the workspace (S8707 path traversal).
+function resolveOutput(argvPath) {
+	if (!argvPath) return join(root, "public", "assets", "og.png");
+	const resolved = resolve(root, argvPath);
+	const inside = relative(root, resolved);
+	if (isAbsolute(inside) || inside.startsWith("..")) {
+		throw new Error(`Output path must stay inside the repository: ${argvPath}`);
+	}
+	return resolved;
+}
+const out = resolveOutput(process.argv[2]);
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -96,7 +107,7 @@ function render(url) {
 }
 
 async function main() {
-	const url = "file:///" + source.replace(/\\/g, "/");
+	const url = "file:///" + source.replaceAll("\\", "/");
 	await render(url);
 
 	const bytes = readFileSync(out);

@@ -439,10 +439,10 @@ function wireTree(bc: HTMLElement) {
 function wireFileHead() {
 	document.getElementById('aeSave')?.addEventListener('click', saveFile);
 	document.getElementById('aeRename')?.addEventListener('click', () => {
-		if (openPath) renameFile(openPath);
+		if (openPath) void renameFile(openPath);
 	});
 	document.getElementById('aeDelete')?.addEventListener('click', () => {
-		if (openPath) deleteFile(openPath);
+		if (openPath) void deleteFile(openPath);
 	});
 	document.getElementById('aeDocs')?.addEventListener('click', () => {
 		if (openPath) {
@@ -465,19 +465,19 @@ function handleTreeAction(action: string, path: string) {
 			schedulePersist();
 			break;
 		case 'openFile':
-			openFile(path);
+			void openFile(path);
 			break;
 		case 'renameFile':
-			renameFile(path);
+			void renameFile(path);
 			break;
 		case 'deleteFile':
-			deleteFile(path);
+			void deleteFile(path);
 			break;
 		case 'renameFolder':
-			renameFolder(path);
+			void renameFolder(path);
 			break;
 		case 'deleteFolder':
-			deleteFolder(path);
+			void deleteFolder(path);
 			break;
 	}
 }
@@ -679,7 +679,7 @@ function showQuickAdd() {
 		renderTree();
 		// Open the first generated file
 		const firstPath = joinPath(currentDir, Object.keys(result)[0]);
-		if (files[firstPath] !== undefined) openFile(firstPath);
+		if (files[firstPath] !== undefined) void openFile(firstPath);
 	};
 
 	confirmBtn.addEventListener('click', () => close(true));
@@ -740,7 +740,7 @@ async function newFile() {
 	files[path] = encodeUtf8('');
 	persistNow();
 	renderTree();
-	openFile(path);
+	void openFile(path);
 }
 
 async function newFolder() {
@@ -976,7 +976,7 @@ export function init() {
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', initTool);
 	} else {
-		initTool();
+		void initTool();
 	}
 }
 

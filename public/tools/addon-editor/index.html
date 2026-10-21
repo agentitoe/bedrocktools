@@ -92,42 +92,13 @@
         <main id="main">
             <div class="tool-container" id="app"></div>
         </main>
-		<footer class="site-footer">
-			<div class="container">
-				<div class="footer-inner">
-					<div>
-						<div class="footer-brand">BEDROCK TOOLS</div>
-						<p class="footer-tagline" data-i18n="footerTagline">Herramientas gratuitas para Minecraft, en Java y Bedrock.</p>
-					</div>
-					<nav class="footer-nav" aria-label="Footer">
-						<div class="footer-col">
-							<span class="footer-heading" data-i18n="footerColProject">Proyecto</span>
-							<a
-								class="footer-link"
-								href="https://github.com/agentitoe/bedrocktools"
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-external"/></svg>
-								GitHub
-							</a>
-							<a class="footer-link" href="/licenses">
-								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-file"/></svg>
-								<span data-i18n="footerLicense">Licencias</span>
-							</a>
-							<a class="footer-link" href="/">
-								<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-blocks"/></svg>
-								<span data-i18n="footerAllTools">Todas las herramientas</span>
-							</a>
-						</div>
-					</nav>
-				</div>
-				<div class="footer-bottom">
-					<span data-i18n="copyright"></span>
-					<span data-i18n="footerMadeWith">Hecho con ♥ para la comunidad de Minecraft</span>
-				</div>
-			</div>
-		</footer>
+		<footer
+			class="site-footer"
+			data-chrome="footer"
+			data-footer-variant="default"
+			data-footer-tagline="Herramientas gratuitas para Minecraft, en Java y Bedrock."
+		></footer>
+		<script src="../../assets/footer.js" defer></script>
         <script type="module">
             import { init } from "./bundle.js";
             init();

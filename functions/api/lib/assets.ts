@@ -41,7 +41,7 @@ function getAssets(): Fetcher {
  * Returns `null` when the path must not be used.
  */
 export function sanitizeAssetPath(raw: string): string | null {
-	const cleaned = raw.replace(/\\/g, "/").trim();
+	const cleaned = raw.replaceAll("\\", "/").trim();
 	if (!cleaned) return null;
 	if (cleaned.includes("..")) return null;
 	if (!/^\/?[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(cleaned)) return null;

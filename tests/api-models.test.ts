@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
-import type { Fetcher } from "@cloudflare/workers-types";
-import { bindAssets } from "../functions/api/lib/assets";
+import { setupTestAssets } from "./helpers/api-env";
 import { loadAllModels, resolveModel } from "../functions/api/lib/models";
 
 /**
@@ -9,28 +7,8 @@ import { loadAllModels, resolveModel } from "../functions/api/lib/models";
  * (elements replace, textures leaf-wins, display merges by slot) against the
  * real `public/data/models/all.json` bundle the endpoint serves.
  */
-const publicDir = join(import.meta.dir, "..", "public");
 
-function mockAssets(publicRoot: string = publicDir): Fetcher {
-	// Mirrors the real ASSETS binding: missing paths fall back to index.html
-	// with 200 (SPA fallback), so handlers must not trust `ok` alone.
-	const spaFallback = Bun.file(join(publicRoot, "index.html"));
-	return {
-		fetch: async (input: RequestInfo | URL) => {
-			const raw = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
-			const { pathname } = new URL(raw);
-			const file = Bun.file(join(publicRoot, pathname));
-			if (await file.exists()) {
-				return new Response(file, { headers: { "content-type": file.type ?? "application/octet-stream" } });
-			}
-			if (await spaFallback.exists()) return new Response(spaFallback, { headers: { "content-type": "text/html" } });
-			return new Response("Not found", { status: 404 });
-		},
-		connect: () => Promise.reject(new Error("not implemented"))
-	} as unknown as Fetcher;
-}
-
-bindAssets(mockAssets());
+setupTestAssets();
 
 type Element = { from: number[]; to: number[]; faces: Record<string, { texture: string }> };
 

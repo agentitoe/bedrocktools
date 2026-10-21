@@ -40,25 +40,8 @@ const translations = {
 		switchToDarkTitle: "Cambiar a tema oscuro",
 	},
 	en: {
-		title: "Bedrock Tools — Tools for Minecraft",
-		skipToContent: "Skip to content",
-		heroBadge: "Tools for Minecraft Java & Bedrock",
-		tagline: "Convert addons, calculate coordinates, organize your packs, browse every item in the game and write recipes. It all runs in your browser.",
-		heroCtaPrimary: "Explore tools",
-		heroCtaSecondary: "Browse items & blocks",
-		statItems: "Items catalogued",
-		statTools: "Tools",
-		statLanguages: "Languages",
-		statUploads: "Files uploaded",
-		toolsEyebrow: "Tools",
-		toolsTitle: "Pick your tool",
-		toolsSubtitle: "Everything you need for Minecraft, on Java and Bedrock.",
-		groupBoth: "Java & Bedrock",
-		groupBedrock: "Bedrock only",
-		openTool: "Open",
-		toolsLoadError: "We couldn't load the tool list. Reload the page to try again.",
-		featuresEyebrow: "Benefits",
-		featuresTitle: "Why Bedrock Tools",
+		copyright: "© 2026 AgentitoE",
+		changeLanguageTitle: "Change language",
 		feature1Title: "Your files never leave the browser",
 		feature1Desc: "Every conversion happens on your device. No pack, recipe or command goes through a server of ours.",
 		feature2Title: "Instant",
@@ -67,15 +50,32 @@ const translations = {
 		feature3Desc: "Packs are laid out in the com.mojang structure the console expects, and recipes export as a Data Pack too.",
 		feature4Title: "Free, no accounts, two languages",
 		feature4Desc: "No sign-up, no ads, no hidden paid tier. Spanish and English across every tool.",
-		footerTagline: "Free tools for the Minecraft ecosystem, on Java and Bedrock.",
+		featuresEyebrow: "Benefits",
+		featuresTitle: "Why Bedrock Tools",
 		footerColProject: "Project",
 		footerLicense: "Licenses",
 		footerIssues: "Report a bug",
-		copyright: "© 2026 AgentitoE",
+		footerTagline: "Free tools for the Minecraft ecosystem, on Java and Bedrock.",
 		footerMadeWith: "Made with ♥ for the Minecraft community",
-		changeLanguageTitle: "Change language",
+		groupBoth: "Java & Bedrock",
+		groupBedrock: "Bedrock only",
+		heroBadge: "Tools for Minecraft Java & Bedrock",
+		heroCtaPrimary: "Explore tools",
+		heroCtaSecondary: "Browse items & blocks",
+		openTool: "Open",
+		skipToContent: "Skip to content",
+		statItems: "Items catalogued",
+		statLanguages: "Languages",
+		statTools: "Tools",
+		statUploads: "Files uploaded",
 		switchToLightTitle: "Switch to light theme",
 		switchToDarkTitle: "Switch to dark theme",
+		tagline: "Convert addons, calculate coordinates, organize your packs, browse every item in the game and write recipes. It all runs in your browser.",
+		toolsEyebrow: "Tools",
+		title: "Bedrock Tools — Tools for Minecraft",
+		toolsTitle: "Pick your tool",
+		toolsSubtitle: "Everything you need for Minecraft, on Java and Bedrock.",
+		toolsLoadError: "We couldn't load the tool list. Reload the page to try again.",
 	},
 };
 
@@ -104,8 +104,8 @@ function toolIcon(iconKey) {
 
 function platformLabel(tool, lang) {
 	const platforms = Array.isArray(tool.platforms) ? tool.platforms : ["bedrock"];
-	const both = platforms.indexOf("java") !== -1 && platforms.indexOf("bedrock") !== -1;
-	if (both) return lang === "es" ? "Java + Bedrock" : "Java + Bedrock";
+	const both = platforms.includes("java") && platforms.includes("bedrock");
+	if (both) return "Java + Bedrock";
 	return lang === "es" ? "Solo Bedrock" : "Bedrock only";
 }
 
