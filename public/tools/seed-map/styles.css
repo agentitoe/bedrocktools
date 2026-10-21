@@ -1,0 +1,262 @@
+/* ===== Seed Map tool styles =====
+   Layout and controls of the seed map page. Colours, spacing, typography and
+   shared pieces (card, top bar, buttons, footer) come from
+   public/assets/styles.css — only .sm-* rules live here. */
+
+.sm-card {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	max-width: 1100px;
+	margin: 0 auto;
+}
+
+/* ------------------------------------------------------------ toolbar */
+
+.sm-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 14px;
+}
+.sm-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.sm-field > label {
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+.sm-field input[type="text"],
+.sm-field select {
+	padding: 10px 12px;
+	border: 2px solid var(--border);
+	border-radius: 10px;
+	font-size: 1rem;
+	font-family: inherit;
+	background: var(--surface);
+	color: var(--text);
+	min-width: 0;
+}
+.sm-field input:focus,
+.sm-field select:focus {
+	outline: none;
+	border-color: var(--primary);
+	box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.sm-field-seed {
+	flex: 1 1 320px;
+}
+.sm-seed-row {
+	display: flex;
+	gap: 8px;
+}
+.sm-seed-row input {
+	flex: 1 1 auto;
+	font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+}
+.sm-random-btn {
+	flex: 0 0 auto;
+}
+.sm-hint {
+	margin: 0;
+	font-size: 0.78rem;
+	color: var(--subtext);
+}
+.sm-error {
+	margin: 0;
+	font-size: 0.82rem;
+	color: var(--error);
+	font-weight: 500;
+}
+.sm-error[hidden] {
+	display: none;
+}
+
+.sm-field-version {
+	flex: 0 1 170px;
+}
+.sm-field-dim {
+	flex: 0 1 190px;
+}
+.sm-dim-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.sm-dim-row select {
+	flex: 1 1 auto;
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+.sm-soon {
+	font-size: 0.68rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--gold-500);
+	border: 1px solid var(--gold-300);
+	border-radius: 999px;
+	padding: 2px 8px;
+	white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- body */
+
+.sm-body {
+	display: grid;
+	grid-template-columns: 250px minmax(0, 1fr);
+	gap: 14px;
+	align-items: stretch;
+}
+
+.sm-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	background: var(--surface-alt, var(--surface-hover));
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	max-height: var(--seed-map-height, 480px);
+	overflow-y: auto;
+}
+.sm-panel-title {
+	margin: 0;
+	font-size: 0.72rem;
+	font-weight: 700;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	padding-top: 4px;
+}
+
+.sm-layers {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-bottom: 8px;
+}
+.sm-layer {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 6px;
+	border-radius: 8px;
+	font-size: 0.88rem;
+	cursor: pointer;
+	user-select: none;
+}
+.sm-layer:hover {
+	background: var(--primary-light);
+}
+.sm-layer input[type="checkbox"] {
+	accent-color: var(--primary);
+	margin: 0;
+}
+.sm-layer-dot {
+	width: 12px;
+	height: 12px;
+	border-radius: 4px;
+	flex: 0 0 auto;
+}
+.sm-layer.is-disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+.sm-layer.is-disabled:hover {
+	background: transparent;
+}
+
+.sm-legend {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 4px;
+}
+.sm-legend-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.82rem;
+	color: var(--text);
+}
+.sm-legend-swatch {
+	width: 14px;
+	height: 14px;
+	border-radius: 3px;
+	flex: 0 0 auto;
+	border: 1px solid rgb(0 0 0 / 0.15);
+}
+
+/* ----------------------------------------------------------------- map */
+
+.sm-map {
+	position: relative;
+	width: 100%;
+	min-height: 320px;
+	height: var(--seed-map-height, 480px);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	overflow: hidden;
+	background: var(--ink-900);
+}
+
+/* ------------------------------------------------------------- status */
+
+.sm-status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 18px;
+	padding: 10px 14px;
+	background: var(--surface-alt, var(--surface-hover));
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+	font-size: 0.82rem;
+	color: var(--text);
+}
+.sm-status-cell {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	min-width: 0;
+}
+.sm-status-label {
+	font-family: "Outfit", sans-serif;
+	font-size: 0.68rem;
+	font-weight: 700;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+.sm-status-value {
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+.sm-status-value.is-error {
+	color: var(--error);
+	font-weight: 600;
+}
+.sm-status-value.is-pending {
+	color: var(--gold-500);
+}
+
+/* ---------------------------------------------------------- responsive */
+
+@media (max-width: 860px) {
+	.sm-body {
+		grid-template-columns: 1fr;
+	}
+	.sm-panel {
+		order: 2;
+		max-height: 320px;
+	}
+	.sm-map {
+		order: 1;
+	}
+}

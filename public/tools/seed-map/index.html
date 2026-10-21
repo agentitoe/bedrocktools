@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Mapa de semillas de Minecraft: explora biomas y estructuras de una semilla Java (Aldeas, Fortalezas, Ciudad Antigua, monumentos y más)"
+        />
+        <meta
+            name="keywords"
+            content="seed map, mapa de semillas, minecraft, semilla, biomas, estructuras, java"
+        />
+        <link rel="canonical" href="https://bedrocktools.pages.dev/tools/seed-map/" />
+        <link rel="alternate" hreflang="es" href="https://bedrocktools.pages.dev/tools/seed-map/" />
+        <link rel="alternate" hreflang="en" href="https://bedrocktools.pages.dev/tools/seed-map/" />
+        <link
+            rel="alternate"
+            hreflang="x-default"
+            href="https://bedrocktools.pages.dev/tools/seed-map/"
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Mapa de Semillas Minecraft — Bedrock Tools" />
+        <meta
+            property="og:description"
+            content="Explora biomas y estructuras de una semilla Java en el mapa"
+        />
+        <meta property="og:url" content="https://bedrocktools.pages.dev/tools/seed-map/" />
+        <meta property="og:site_name" content="Bedrock Tools" />
+        <meta
+            property="og:image"
+            content="https://bedrocktools.pages.dev/assets/favicon.svg"
+        />
+        <meta property="og:locale" content="es_ES" />
+        <meta property="og:locale:alternate" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Mapa de Semillas Minecraft — Bedrock Tools" />
+        <meta
+            name="twitter:description"
+            content="Explora biomas y estructuras de una semilla Java en el mapa"
+        />
+        <meta
+            name="twitter:image"
+            content="https://bedrocktools.pages.dev/assets/favicon.svg"
+        />
+        <title data-i18n="title">Mapa de Semillas Minecraft — Bedrock Tools</title>
+        <link rel="icon" type="image/webp" href="/assets/favicon.svg" />
+        <link rel="apple-touch-icon" href="/assets/favicon.svg" />
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/outfit-latin.woff2" crossorigin />
+
+        <link rel="stylesheet" href="../../assets/styles.css" />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <a class="skip-link" href="#main" data-i18n="skipToContent">Saltar al contenido</a>
+        <a class="back-link" href="/"
+            ><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-arrow-left"/></svg>
+            <span data-i18n="backHome">Volver al inicio</span></a
+        >
+        <div class="top-bar">
+            <button
+                class="icon-btn lang-toggle"
+                id="langToggle"
+                title="Cambiar idioma"
+                aria-label="Change language"
+            ></button>
+            <div class="lang-dropdown" id="langDropdown" role="menu"></div>
+            <button
+                class="icon-btn theme-toggle"
+                id="themeToggle"
+                title="Cambiar tema"
+                aria-label="Toggle theme"
+            ></button>
+        </div>
+        <main id="main">
+            <div class="card sm-card">
+                <h1 data-i18n="heading">Mapa de Semillas</h1>
+                <p class="subtitle" data-i18n="description">
+                    Explora biomas y estructuras de una semilla Java en el mundo
+                </p>
+
+                <form class="sm-toolbar" id="smToolbar" autocomplete="off">
+                    <div class="sm-field sm-field-seed">
+                        <label for="smSeed" data-i18n="seedLabel">Semilla</label>
+                        <div class="sm-seed-row">
+                            <input
+                                type="text"
+                                id="smSeed"
+                                placeholder="Ej: 123456789 o «mi semilla»"
+                                data-i18n="seedPlaceholder"
+                                spellcheck="false"
+                                autocapitalize="off"
+                            />
+                            <button
+                                type="button"
+                                class="btn sm-random-btn"
+                                id="smRandomBtn"
+                                title="Generar una semilla aleatoria"
+                                data-i18n="randomSeedBtn"
+                            >
+                                Aleatoria
+                            </button>
+                        </div>
+                        <p class="sm-hint" data-i18n="seedHint">
+                            Texto (u otro número demasiado grande) → hash como Java Edition
+                        </p>
+                        <p class="sm-error" id="smSeedError" role="alert" hidden>
+                            <span data-i18n="seedInvalid">Introduce una semilla válida</span>
+                        </p>
+                    </div>
+                    <div class="sm-field sm-field-version">
+                        <label for="smVersion" data-i18n="versionLabel">Versión</label>
+                        <select id="smVersion"><!-- options injected by controls --></select>
+                    </div>
+                    <div class="sm-field sm-field-dim">
+                        <label for="smDim" data-i18n="dimensionLabel">Dimensión</label>
+                        <div class="sm-dim-row">
+                            <select id="smDim" disabled>
+                                <option value="0" data-i18n="dimensionOverworld">Overworld</option>
+                                <option value="-1" data-i18n="dimensionNether">Nether</option>
+                                <option value="1" data-i18n="dimensionEnd">End</option>
+                            </select>
+                            <span class="sm-soon" data-i18n="comingSoonBadge">Próximamente</span>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="sm-body">
+                    <aside class="sm-panel" aria-label="Structures">
+                        <h2 class="sm-panel-title" data-i18n="layersLabel">Estructuras</h2>
+                        <div id="smLayers" class="sm-layers"><!-- toggles injected by controls --></div>
+                        <h2 class="sm-panel-title" data-i18n="legendLabel">Leyenda de biomas</h2>
+                        <div id="smLegend" class="sm-legend"><!-- swatches injected by controls --></div>
+                    </aside>
+                    <div id="smMap" class="sm-map" aria-label="Seed world map"></div>
+                </div>
+
+                <div class="sm-status" role="status" aria-live="polite">
+                    <span class="sm-status-cell"
+                        ><span class="sm-status-label" data-i18n="statusCoordsLabel">Cursor</span>
+                        <span class="sm-status-value" id="smStatusCoords">—</span></span
+                    >
+                    <span class="sm-status-cell"
+                        ><span class="sm-status-label" data-i18n="statusSeedLabel">Semilla</span>
+                        <span class="sm-status-value" id="smStatusSeed">—</span></span
+                    >
+                    <span class="sm-status-cell"
+                        ><span class="sm-status-label" data-i18n="statusVersionLabel">Versión</span>
+                        <span class="sm-status-value" id="smStatusVersion">—</span></span
+                    >
+                    <span class="sm-status-cell"
+                        ><span class="sm-status-label" data-i18n="statusTilesLabel">Tiles</span>
+                        <span class="sm-status-value" id="smStatusTiles">—</span></span
+                    >
+                </div>
+            </div>
+        </main>
+        <footer class="site-footer">
+            <div class="container">
+                <div class="footer-inner">
+                    <div>
+                        <div class="footer-brand">BEDROCK TOOLS</div>
+                        <p class="footer-tagline" data-i18n="footerTagline">
+                            Herramientas gratuitas para Minecraft, en Java y Bedrock.
+                        </p>
+                    </div>
+                    <nav class="footer-nav" aria-label="Footer">
+                        <div class="footer-col">
+                            <span class="footer-heading" data-i18n="footerColProject">Proyecto</span>
+                            <a
+                                class="footer-link"
+                                href="https://github.com/agentitoe/bedrocktools"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-external"/></svg>
+                                GitHub
+                            </a>
+                            <a class="footer-link" href="/licenses">
+                                <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-file"/></svg>
+                                <span data-i18n="footerLicense">Licencias</span>
+                            </a>
+                            <a class="footer-link" href="/">
+                                <svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-blocks"/></svg>
+                                <span data-i18n="footerAllTools">Todas las herramientas</span>
+                            </a>
+                        </div>
+                    </nav>
+                </div>
+                <div class="footer-bottom">
+                    <span data-i18n="copyright"></span>
+                    <span data-i18n="footerMadeWith">Hecho con ♥ para la comunidad de Minecraft</span>
+                </div>
+            </div>
+        </footer>
+        <script type="module">
+            import { init } from "./bundle.js";
+            init();
+        </script>
+    </body>
+</html>

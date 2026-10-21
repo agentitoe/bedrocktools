@@ -31,6 +31,9 @@ import { STRUCTURE_CATALOG, structuresForMc } from './structures/catalog';
 import type { ViewEvent } from './map-view';
 import type { WorldRect } from './types';
 import type { SeedVersion } from './workers/protocol';
+import { initUi } from '../../shared/ui';
+import { translations } from './translations';
+import { parseSeedInput } from './ui/seed-text';
 
 export type SeedMapState = {
 	/** Raw 64-bit world seed as a bigint (the UI border keeps it exact). */
@@ -55,7 +58,7 @@ export type SeedMapHandle = {
 	dispose(): Promise<void>;
 };
 
-const DEFAULT_VERSION = 34; // MC_1_21_WD in this pin of cubiomes (biomes.h)
+const DEFAULT_VERSION = 32; // MC_1_21 (= MC_1_21_11) in this pin of cubiomes (biomes.h)
 const LEGEND_IDS = [0, 1, 2, 4, 5, 7, 9, 37, 44, 179] as const;
 const TILE_PX = 256;
 const MAX_TILES = 160;
@@ -225,6 +228,47 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 			legend.remove();
 		},
 	};
+}
+
+// ------------------------------------------------------------ page bootstrap
+
+let handle: SeedMapHandle | null = null;
+
+/**
+ * Entry point wired by public/tools/seed-map/index.html. Mounts the shared
+ * UI chrome (language/theme) plus the map into #smMap, and applies the seed
+ * from the ?seed= query param (already canonical decimal via controls) or a
+ * sensible default so the first paint is instant.
+ */
+export function init(): void {
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initTool);
+	} else {
+		initTool();
+	}
+}
+
+function initTool(): void {
+	initUi(translations);
+	// controls.ts wires the toolbar layers/version/status around this handle.
+	const target = document.getElementById('smMap');
+	handle = target === null ? null : mountSeedMap(target);
+	if (handle !== null) {
+		const params = new URLSearchParams(window.location.search);
+		const raw = params.get('seed');
+		const seed = parseSeedParam(raw);
+		void handle.setState({ seed, version: DEFAULT_VERSION, dim: 0 });
+	}
+}
+
+/** Parses the ?seed= query value; unknown text falls back to the Java hash. */
+function parseSeedParam(raw: string | null): bigint {
+	if (raw === null || raw === '') return 0n;
+	try {
+		return parseSeedInput(raw);
+	} catch {
+		return 0n;
+	}
 }
 
 // ------------------------------------------------------------------ pieces

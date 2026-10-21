@@ -16,7 +16,7 @@ const ALLOWED_PLATFORMS = new Set(["java", "bedrock"]);
 // yet (they land with manifest/page in a later milestone). The required-files
 // tests below must not fire on them; remove the slug from here when its
 // manifest and page arrive.
-const TOOL_IN_PROGRESS = new Set<string>(["seed-map"]);
+const TOOL_IN_PROGRESS = new Set<string>();
 
 const isPublished = (slug: string) => !TOOL_IN_PROGRESS.has(slug);
 
