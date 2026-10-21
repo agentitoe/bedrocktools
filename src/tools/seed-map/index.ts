@@ -33,7 +33,8 @@ import type { WorldRect } from './types';
 import type { SeedVersion } from './workers/protocol';
 import { initUi } from '../../shared/ui';
 import { translations } from './translations';
-import { parseSeedInput } from './ui/seed-text';
+import { mountControls } from './ui/controls';
+import { LEGEND_IDS } from './ui/legend';
 
 export type SeedMapState = {
 	/** Raw 64-bit world seed as a bigint (the UI border keeps it exact). */
@@ -55,11 +56,17 @@ export type SeedMapHandle = {
 	onMarkerPick(handler: (marker: Marker | null) => void): void;
 	/** Toggle the legend strip visibility. */
 	setLegendVisible(visible: boolean): void;
+	/** Cursor world position over the map (floored), null when off-map. */
+	onCursorMove(handler: (pos: WorldPos | null) => void): () => void;
+	/** Tiles currently queued/running in the pool (status bar, controls). */
+	tilesPending(): number;
 	dispose(): Promise<void>;
 };
 
+/** Floored world coordinates reported by onCursorMove. */
+export type WorldPos = { x: number; z: number };
+
 const DEFAULT_VERSION = 32; // MC_1_21 (= MC_1_21_11) in this pin of cubiomes (biomes.h)
-const LEGEND_IDS = [0, 1, 2, 4, 5, 7, 9, 37, 44, 179] as const;
 const TILE_PX = 256;
 const MAX_TILES = 160;
 
@@ -70,7 +77,7 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 	stack.style.overflow = 'hidden';
 	stack.style.touchAction = 'none';
 	stack.style.width = '100%';
-	stack.style.height = '480px';
+	stack.style.height = 'var(--seed-map-height, 480px)';
 	stack.style.cursor = 'grab';
 
 	const baseCanvas = document.createElement('canvas');
@@ -177,6 +184,21 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 	};
 	overlayCanvas.addEventListener('click', onOverlayClick);
 
+	// Cursor: pointer-move over the overlay reports the FLOORED world block
+	// through screenToWorld (status bar reads it; view stays camera-keyed).
+	const cursorHandlers = new Set<(pos: WorldPos | null) => void>();
+	const onOverlayPointerMove = (event: PointerEvent) => {
+		const bounds = overlayCanvas.getBoundingClientRect();
+		const world = view.screenToWorld(event.clientX - bounds.left, event.clientY - bounds.top);
+		const pos = { x: Math.floor(world.x), z: Math.floor(world.z) };
+		for (const handler of cursorHandlers) handler(pos);
+	};
+	const onOverlayPointerLeave = () => {
+		for (const handler of cursorHandlers) handler(null);
+	};
+	overlayCanvas.addEventListener('pointermove', onOverlayPointerMove);
+	overlayCanvas.addEventListener('pointerleave', onOverlayPointerLeave);
+
 	return {
 		async setState({ seed, version = DEFAULT_VERSION, dim = 0 }: SeedMapState & { version?: number; dim?: number }) {
 			const seedValue = asSeed64(seed); // validates the u64 range at the border
@@ -216,8 +238,17 @@ export function mountSeedMap(root: HTMLElement): SeedMapHandle {
 		setLegendVisible(visible) {
 			legend.style.display = visible ? '' : 'none';
 		},
+		onCursorMove(handler) {
+			cursorHandlers.add(handler);
+			return () => void cursorHandlers.delete(handler);
+		},
+		tilesPending() {
+			return manager.pendingCount;
+		},
 		async dispose() {
 			overlayCanvas.removeEventListener('click', onOverlayClick);
+			overlayCanvas.removeEventListener('pointermove', onOverlayPointerMove);
+			overlayCanvas.removeEventListener('pointerleave', onOverlayPointerLeave);
 			unbindView();
 			unsubPool();
 			unsubScanner();
@@ -250,32 +281,12 @@ export function init(): void {
 
 function initTool(): void {
 	initUi(translations);
-	// controls.ts wires the toolbar layers/version/status around this handle.
 	const target = document.getElementById('smMap');
 	handle = target === null ? null : mountSeedMap(target);
-	if (handle !== null) {
-		const params = new URLSearchParams(window.location.search);
-		const raw = params.get('seed');
-		const seed = parseSeedParam(raw);
-		void handle.setState({ seed, version: DEFAULT_VERSION, dim: 0 });
-	}
-}
-
-/** Parses the ?seed= query value; unknown text falls back to the Java hash. */
-function parseSeedParam(raw: string | null): bigint {
-	if (raw === null || raw === '') return 0n;
-	try {
-		return parseSeedInput(raw);
-	} catch {
-		return 0n;
-	}
+	if (handle !== null) mountControls(handle);
 }
 
 // ------------------------------------------------------------------ pieces
-
-function createPoolWorker() {
-	return createSeedWorker();
-}
 
 function emitSpawn(pool: WorkerPool, seed: { hi: number; lo: number }, version: number, dim: number): void {
 	const batch: PoolBatch = {
