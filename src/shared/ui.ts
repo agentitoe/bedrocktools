@@ -89,7 +89,13 @@ function setLangToggleLabel(lang: string): void {
 	if (!langToggle) return;
 	const meta = languageByCode(lang);
 	const label = meta ? meta.label : lang.toUpperCase();
-	langToggle.innerHTML = `${ICON.globe}<span class="label">${label}</span>`;
+	langToggle.textContent = '';
+	const iconWrap = document.createElement('span');
+	iconWrap.innerHTML = ICON.globe;
+	const labelSpan = document.createElement('span');
+	labelSpan.className = 'label';
+	labelSpan.textContent = label;
+	langToggle.append(iconWrap, labelSpan);
 	langToggle.setAttribute('aria-expanded', 'false');
 	langToggle.setAttribute('aria-haspopup', 'true');
 }
