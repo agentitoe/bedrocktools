@@ -42,6 +42,7 @@
 | 🧱   | Items & Blocks         | `/tools/minecraft-items`       | Java + Bedrock | Every item and block, with crafting recipes and rendered icons.                             |
 | ⚒️   | Recipe Creator         | `/tools/recipe-creator`        | Java + Bedrock | Writes custom recipes — a `.mcpack` for Bedrock or a Data Pack for Java.                    |
 | 🗺️   | Coordinates Calculator | `/tools/coordinates-converter` | Java + Bedrock | Overworld ↔ Nether coordinates, using the 1:8 rule.                                         |
+| 🗺️   | Seed Map               | `/tools/seed-map`              | Java + Bedrock | Biome map and structure finder by seed, computed entirely in your browser.                  |
 | 🎁   | /give Generator        | `/tools/give-creator`          | Java + Bedrock | Builds custom `/give` commands: name, lore, enchantments, attributes, potions and more.     |
 | 🧩   | Addon Editor           | `/tools/addon-editor`          | Bedrock        | Create and edit Behavior/Resource Packs with a file tree, code editor and a final download. |
 
