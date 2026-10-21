@@ -10,6 +10,7 @@
     "build:og": "bun scripts/build-og.mjs",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "bench:seed-map": "bun scripts/bench-seedmap.mjs",
     "dev": "bun run build && bun scripts/serve.mjs",
     "dev:functions": "wrangler pages dev public --port 8787",
     "deploy": "wrangler pages deploy public"
