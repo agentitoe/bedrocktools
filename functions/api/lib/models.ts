@@ -97,7 +97,7 @@ function mergeDisplay(chain: RawModel[]): Record<string, unknown> | null {
 		const own = model.display;
 		// Only objects carry transform slots; anything else inherits untouched.
 		if (!own || typeof own !== "object" || Array.isArray(own)) continue;
-		merged = { ...(merged ?? {}), ...(own as Record<string, unknown>) };
+		merged = { ...merged, ...(own as Record<string, unknown>) };
 	}
 	return merged;
 }
