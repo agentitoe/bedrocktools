@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Generador de círculos para Minecraft Java y Bedrock: crea anillos, círculos rellenos y cilindros con vista previa y comandos /fill listos para pegar."
+        />
+        <meta
+            name="keywords"
+            content="generador de circulos, circle generator, minecraft, comandos, fill, setblock, mcfunction, bedrock, java"
+        />
+        <link rel="canonical" href="https://bedrocktools.pages.dev/tools/circle-generator/" />
+        <link
+            rel="alternate"
+            hreflang="es"
+            href="https://bedrocktools.pages.dev/tools/circle-generator/"
+        />
+        <link
+            rel="alternate"
+            hreflang="en"
+            href="https://bedrocktools.pages.dev/tools/circle-generator/"
+        />
+        <link
+            rel="alternate"
+            hreflang="x-default"
+            href="https://bedrocktools.pages.dev/tools/circle-generator/"
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Generador de Círculos Minecraft — Bedrock Tools" />
+        <meta
+            property="og:description"
+            content="Crea círculos, anillos y cilindros perfectos para Minecraft Java y Bedrock con vista previa y comandos /fill."
+        />
+        <meta property="og:url" content="https://bedrocktools.pages.dev/tools/circle-generator/" />
+        <meta property="og:site_name" content="Bedrock Tools" />
+        <meta property="og:image" content="https://bedrocktools.pages.dev/assets/favicon.svg" />
+        <meta property="og:locale" content="es_ES" />
+        <meta property="og:locale:alternate" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Generador de Círculos Minecraft — Bedrock Tools" />
+        <meta
+            name="twitter:description"
+            content="Crea círculos, anillos y cilindros perfectos para Minecraft Java y Bedrock con vista previa y comandos /fill."
+        />
+        <meta
+            name="twitter:image"
+            content="https://bedrocktools.pages.dev/assets/favicon.svg"
+        />
+        <title data-i18n="title">Generador de Círculos Minecraft — Bedrock Tools</title>
+        <link rel="icon" type="image/webp" href="/assets/favicon.svg" />
+        <link rel="apple-touch-icon" href="/assets/favicon.svg" />
+        <link rel="preload" as="font" type="font/woff2" href="/fonts/outfit-latin.woff2" crossorigin />
+        <link rel="stylesheet" href="../../assets/styles.css" />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <a class="skip-link" href="#main" data-i18n="skipToContent">Saltar al contenido</a>
+        <a class="back-link" href="/"
+            ><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-arrow-left"/></svg>
+            <span data-i18n="backHome">Volver al inicio</span></a
+        >
+        <div class="top-bar">
+            <button
+                class="icon-btn lang-toggle"
+                id="langToggle"
+                title="Cambiar idioma"
+                aria-label="Change language"
+            ></button>
+            <div class="lang-dropdown" id="langDropdown" role="menu"></div>
+            <button
+                class="icon-btn theme-toggle"
+                id="themeToggle"
+                title="Cambiar tema"
+                aria-label="Toggle theme"
+            ></button>
+        </div>
+        <main id="main">
+            <div class="card">
+                <h1 data-i18n="heading">Generador de Círculos</h1>
+                <p class="subtitle" data-i18n="description">
+                    Crea círculos, anillos y cilindros perfectos con vista previa y
+                    comandos listos para pegar.
+                </p>
+                <form class="circle-form" id="circleForm">
+                    <h2 class="form-heading" data-i18n="formTitle">Configuración</h2>
+                    <div class="setting-group">
+                        <label for="circleDiameter" data-i18n="diameterLabel"
+                            >Diámetro (bloques)</label
+                        >
+                        <div class="diameter-controls">
+                            <input
+                                type="range"
+                                id="circleDiameterRange"
+                                min="2"
+                                max="256"
+                                value="16"
+                                aria-label="Diámetro"
+                            />
+                            <input type="number" id="circleDiameter" value="16" min="2" max="256" required />
+                            <output class="value-badge" id="circleDiameterValue">16</output>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <p class="direction-label" data-i18n="modeLabel">Modo:</p>
+                        <div class="direction-options">
+                            <label class="direction-option">
+                                <input type="radio" name="circleMode" value="hollow" checked />
+                                <span data-i18n="modeHollow">Anillo (vacío)</span>
+                            </label>
+                            <label class="direction-option">
+                                <input type="radio" name="circleMode" value="filled" />
+                                <span data-i18n="modeFilled">Círculo (relleno)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group" id="circleThicknessRow">
+                        <label for="circleThickness" data-i18n="thicknessLabel"
+                            >Grosor del anillo</label
+                        >
+                        <div class="diameter-controls">
+                            <input
+                                type="range"
+                                id="circleThicknessRange"
+                                min="1"
+                                max="16"
+                                value="1"
+                                aria-label="Grosor"
+                            />
+                            <input type="number" id="circleThickness" value="1" min="1" max="16" />
+                            <output class="value-badge" id="circleThicknessValue">1</output>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="circleHeight" data-i18n="heightLabel"
+                            >Altura (cilindro)</label
+                        >
+                        <div class="diameter-controls">
+                            <input
+                                type="range"
+                                id="circleHeightRange"
+                                min="1"
+                                max="64"
+                                value="1"
+                                aria-label="Altura"
+                            />
+                            <input type="number" id="circleHeight" value="1" min="1" max="64" />
+                            <output class="value-badge" id="circleHeightValue">1</output>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="circleBlockSelect" data-i18n="blockLabel">Bloque:</label>
+                        <select id="circleBlockSelect">
+                            <option value="white_concrete" selected>White concrete</option>
+                            <option value="black_concrete">Black concrete</option>
+                            <option value="red_concrete">Red concrete</option>
+                            <option value="blue_concrete">Blue concrete</option>
+                            <option value="stone">Stone</option>
+                            <option value="cobblestone">Cobblestone</option>
+                            <option value="oak_planks">Oak planks</option>
+                            <option value="dark_oak_planks">Dark oak planks</option>
+                            <option value="oak_log">Oak log</option>
+                            <option value="glass">Glass</option>
+                            <option value="iron_block">Iron block</option>
+                            <option value="gold_block">Gold block</option>
+                            <option value="diamond_block">Diamond block</option>
+                            <option value="emerald_block">Emerald block</option>
+                            <option value="obsidian">Obsidian</option>
+                            <option value="netherrack">Netherrack</option>
+                            <option value="sand">Sand</option>
+                            <option value="glowstone">Glowstone</option>
+                            <option value="custom" data-custom>Custom…</option>
+                        </select>
+                        <div id="circleBlockCustomRow" style="display: none">
+                            <input
+                                type="text"
+                                id="circleBlockCustom"
+                                placeholder="minecraft:bricks"
+                            />
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <p class="direction-label" data-i18n="positionLabel">
+                            Coordenadas del centro
+                        </p>
+                        <div class="coord-row">
+                            <div class="coord-input-group">
+                                <label data-i18n="xLabel">X</label>
+                                <input type="number" id="circleCoordX" value="0" />
+                            </div>
+                            <div class="coord-input-group">
+                                <label data-i18n="yLabel">Y</label>
+                                <input type="number" id="circleCoordY" value="64" />
+                            </div>
+                            <div class="coord-input-group">
+                                <label data-i18n="zLabel">Z</label>
+                                <input type="number" id="circleCoordZ" value="0" />
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="generate-btn" id="circleGenerateBtn" data-i18n="generateBtn">
+                        Generar círculo
+                    </button>
+                </form>
+                <div id="circleError" class="result-error" style="display: none"></div>
+                <div id="circleResult">
+                    <div class="preview-section">
+                        <h3 data-i18n="previewTitle">Vista previa</h3>
+                        <div class="canvas-wrap">
+                            <canvas id="circleCanvas" width="288" height="288" aria-label="Vista previa del círculo"></canvas>
+                        </div>
+                        <p class="preview-note" id="circlePreviewNote"></p>
+                    </div>
+                    <div class="output-section">
+                        <h3 data-i18n="outputTitle">Comandos</h3>
+                        <div class="stats-row">
+                            <span class="stat-chip"><strong id="circleStatDiameter">16</strong> <span data-i18n="statsDiameter">diámetro</span></span>
+                            <span class="stat-chip"><strong id="circleStatBlocks">0</strong> <span data-i18n="statsBlocks">bloques</span></span>
+                            <span class="stat-chip"><strong id="circleStatCommands">0</strong> <span data-i18n="statsCommands">comandos</span></span>
+                        </div>
+                        <textarea id="commandOutput" readonly rows="10" spellcheck="false"></textarea>
+                        <p class="preview-note" id="circleOutputNote" style="display: none"></p>
+                        <div class="output-actions">
+                            <button type="button" class="copy-btn" id="circleCopyBtn" data-i18n="copyBtn">Copiar comandos</button>
+                            <button type="button" class="copy-btn download" id="circleDownloadBtn" data-i18n="downloadBtn">Descargar .mcfunction</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-section">
+                    <h4 data-i18n="infoTitle">Información</h4>
+                    <p data-i18n="infoText1">
+                        Los comandos /fill y /setblock usan la misma sintaxis en Java y
+                        Bedrock: la salida funciona en ambas ediciones sin cambios.
+                    </p>
+                    <p data-i18n="infoText2">
+                        El archivo .mcfunction sirve como función de un Data Pack en Java
+                        o de un Behavior Pack en Bedrock.
+                    </p>
+                    <p data-i18n="infoText3">
+                        Con diámetros pares el centro cae entre dos bloques; con diámetros
+                        impares el bloque central coincide con la coordenada introducida.
+                    </p>
+                </div>
+            </div>
+        </main>
+        <footer
+            class="site-footer"
+            data-chrome="footer"
+            data-footer-variant="default"
+            data-footer-tagline="Herramientas gratuitas para el ecosistema Minecraft Bedrock."
+        ></footer>
+        <script src="../../assets/footer.js" defer></script>
+        <script type="module">
+            import { init } from "./bundle.js";
+            init();
+        </script>
+    </body>
+</html>

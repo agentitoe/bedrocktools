@@ -87,6 +87,7 @@ const TOOL_ICONS = {
 	cube: "i-cube",
 	grid3: "i-grid3",
 	axes: "i-axes",
+	circle: "i-circle",
 	convert: "i-convert",
 	stack: "i-stack",
 	"file-code": "i-file-code",

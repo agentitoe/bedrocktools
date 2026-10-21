@@ -34,6 +34,11 @@
 		<circle cx="12" cy="12" r="2.2" />
 	</symbol>
 
+	<symbol id="i-circle" viewBox="0 0 24 24">
+		<circle cx="12" cy="12" r="8.4" />
+		<circle cx="12" cy="12" r="3.2" />
+	</symbol>
+
 	<symbol id="i-convert" viewBox="0 0 24 24">
 		<path d="M4 8.5h13m-3-3 3 3-3 3" />
 		<path d="M20 15.5H7m3-3-3 3 3 3" />

@@ -32,6 +32,15 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://bedrocktools.pages.dev/tools/coordinates-converter/" />
   </url>
   <url>
+    <loc>https://bedrocktools.pages.dev/tools/circle-generator/</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bedrocktools.pages.dev/tools/circle-generator/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://bedrocktools.pages.dev/tools/circle-generator/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bedrocktools.pages.dev/tools/circle-generator/" />
+  </url>
+  <url>
     <loc>https://bedrocktools.pages.dev/tools/minecraft-items/</loc>
     <lastmod>2026-08-16</lastmod>
     <changefreq>weekly</changefreq>
