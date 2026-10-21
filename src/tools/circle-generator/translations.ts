@@ -39,6 +39,7 @@ export const translations: TranslationTable = {
 		copySuccess: "¡Copiado!",
 		copyError: "Error al copiar",
 		downloadBtn: "Descargar .mcfunction",
+		downloadPngBtn: "Descargar .png",
 		invalidInput: "Ingresa un diámetro válido entre 2 y 256.",
 		invalidBlock: "Nombre de bloque inválido. Usa letras, números, guiones bajos y opcionalmente el prefijo minecraft:.",
 		tooBig: "El resultado supera el límite de 250.000 bloques. Reduce el diámetro o la altura.",
@@ -49,6 +50,7 @@ export const translations: TranslationTable = {
 		infoText1: "Los comandos /fill y /setblock usan la misma sintaxis en Java y Bedrock: la salida funciona en ambas ediciones sin cambios.",
 		infoText2: "El archivo .mcfunction sirve como función de un Data Pack en Java o de un Behavior Pack en Bedrock.",
 		infoText3: "Con diámetros pares el centro cae entre dos bloques; con diámetros impares el bloque central coincide con la coordenada introducida.",
+		infoText4: "La imagen .png descargada es un plano a escala con cuadrícula, útil como plantilla para construir el círculo a mano.",
 	},
 	en: {
 		skipToContent: "Skip to content",
@@ -88,6 +90,7 @@ export const translations: TranslationTable = {
 		copySuccess: "Copied!",
 		copyError: "Copy failed",
 		downloadBtn: "Download .mcfunction",
+		downloadPngBtn: "Download .png",
 		invalidInput: "Enter a valid diameter between 2 and 256.",
 		invalidBlock: "Invalid block name. Use letters, numbers, underscores and optionally the minecraft: prefix.",
 		tooBig: "The result exceeds the 250,000 block limit. Reduce the diameter or the height.",
@@ -98,5 +101,6 @@ export const translations: TranslationTable = {
 		infoText1: "The /fill and /setblock commands use identical syntax in Java and Bedrock: the output works in both editions unchanged.",
 		infoText2: "The .mcfunction file works as a Data Pack function in Java or a Behavior Pack function in Bedrock.",
 		infoText3: "With even diameters the center falls between two blocks; with odd diameters the center block matches the entered coordinate.",
+		infoText4: "The downloaded .png image is a grid-scaled blueprint, handy as a template for building the circle by hand.",
 	},
 };
