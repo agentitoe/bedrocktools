@@ -1,4 +1,5 @@
-import { test, expect } from "bun:test";
+import { test, expect, beforeAll } from "bun:test";
+import { join } from "node:path";
 import type { GiveState } from "../src/tools/give-creator/types";
 import {
 	buildCommand,
@@ -11,7 +12,14 @@ import {
 	parseColorList,
 	parseColor,
 } from "../src/tools/give-creator/builder";
-import { bedrockPotionDataList, resolveBedrockItem } from "../src/tools/give-creator/bedrock-ids";
+import { bedrockPotionDataList, loadBedrockItemMap, resolveBedrockItem } from "../src/tools/give-creator/bedrock-ids";
+
+// The Bedrock item names come from the generated Geyser map (see
+// scripts/fetch-geyser-mappings.mjs); load it once for the whole file.
+beforeAll(async () => {
+	const map = await Bun.file(join(import.meta.dir, "..", "public", "data", "geyser-item-map.json")).json();
+	await loadBedrockItemMap(map as Parameters<typeof loadBedrockItemMap>[0]);
+});
 
 function makeState(overrides: Partial<GiveState> = {}): GiveState {
 	return {
@@ -367,6 +375,20 @@ test("bedrock: unchanged IDs pass through", () => {
 	expect(r.id).toBe("diamond_sword");
 	expect(r.available).toBe(true);
 	expect(r.renamed).toBeUndefined();
+});
+
+test("bedrock: Geyser-sourced renames are applied (no hardcoded table)", () => {
+	// Renames that were NOT in the previous hardcoded table and now come from
+	// the official Geyser mappings.
+	expect(resolveBedrockItem("minecraft:nether_brick").id).toBe("netherbrick");
+	expect(resolveBedrockItem("minecraft:stone_slab").id).toBe("normal_stone_slab");
+	expect(resolveBedrockItem("minecraft:stone_stairs").id).toBe("normal_stone_stairs");
+	expect(resolveBedrockItem("minecraft:shulker_box").id).toBe("undyed_shulker_box");
+	expect(resolveBedrockItem("minecraft:waxed_copper_block").id).toBe("waxed_copper");
+	expect(resolveBedrockItem("minecraft:green_bed").id).toBe("bed");
+	expect(resolveBedrockItem("minecraft:black_banner").id).toBe("banner");
+	const renamed = resolveBedrockItem("minecraft:nether_brick");
+	expect(renamed.renamed).toBe(true);
 });
 
 test("bedrock: beds map to bed + color data", () => {

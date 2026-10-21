@@ -27,6 +27,8 @@ Unit tests live in `tests/` and run with Bun's built-in test runner. Add one whe
 - **Comments in English.**
 - **Every user-facing string goes through the i18n system.** Add `en` but if you can, add `es` as well (see `src/shared/ui.ts` and any tool's `translations.ts`). Don't hardcode copy in markup or code.
 - Tools are self-contained: one folder under `src/tools/<slug>/`, one page under `public/tools/<slug>/`.
+- **Styles go in `public/assets/styles.css` (shared) plus `public/tools/<slug>/styles.css` for tool-specific rules.** Shared chrome (top bar, buttons, cards, drop zone, status, footer) is already in the shared file — don't duplicate it per tool.
+- **Icons come from `public/assets/icons.svg`.** Add a `<symbol>` to the sprite instead of introducing an emoji or a new icon set.
 
 ## Adding a tool
 

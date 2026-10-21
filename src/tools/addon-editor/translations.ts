@@ -2,8 +2,13 @@ import type { TranslationTable } from '../../shared/ui';
 
 export const translations: TranslationTable = {
 	es: {
+		skipToContent: "Saltar al contenido",
+		footerColProject: "Proyecto",
+		footerLicense: "Licencias",
+		footerAllTools: "Todas las herramientas",
+		footerMadeWith: "Hecho con ♥ para la comunidad de Minecraft",
 		title: "Editor de Addons — Bedrock Tools",
-		heading: "🧩 Editor de Addons",
+		heading: "Editor de Addons",
 		description: "Crea desde cero o edita <strong>Behavior Packs</strong>, <strong>Resource Packs</strong> y <strong>Addons</strong> de Minecraft Bedrock: archivos, carpetas, código con sintaxis y descarga final.",
 		changeLanguageTitle: "Cambiar idioma",
 		switchToLightTitle: "Cambiar a tema claro",
@@ -25,7 +30,7 @@ export const translations: TranslationTable = {
 		createAddonDesc: "Un Behavior Pack + un Resource Pack en una sola carpeta (.mcaddon).",
 		openTitle: "Abrir un pack existente",
 		openHint: "Sube un archivo <strong>.mcpack</strong>, <strong>.mcaddon</strong> o <strong>.zip</strong> para editarlo.",
-		dropPrompt: '<span class="noto-color-emoji-regular">👋</span> Arrastra tu pack aquí o <u>haz clic</u> para seleccionar',
+		dropPrompt: 'Arrastra tu pack aquí o <u>haz clic</u> para seleccionar',
 		dropSub: "Se admite .mcpack, .mcaddon y .zip",
 
 		// Editor toolbar
@@ -89,8 +94,13 @@ export const translations: TranslationTable = {
 		refreshNote: "Tu trabajo se guarda automáticamente en este navegador, así puedes continuar donde lo dejaste. Descárgalo cuando quieras un archivo .mcpack/.mcaddon.",
 	},
 	en: {
+		skipToContent: "Skip to content",
+		footerColProject: "Project",
+		footerLicense: "Licenses",
+		footerAllTools: "All tools",
+		footerMadeWith: "Made with ♥ for the Minecraft community",
 		title: "Addon Editor — Bedrock Tools",
-		heading: "🧩 Addon Editor",
+		heading: "Addon Editor",
 		description: "Create from scratch or edit Minecraft Bedrock <strong>Behavior Packs</strong>, <strong>Resource Packs</strong> and <strong>Addons</strong>: files, folders, syntax-highlighted code and a final download.",
 		changeLanguageTitle: "Change language",
 		switchToLightTitle: "Switch to light theme",
@@ -112,7 +122,7 @@ export const translations: TranslationTable = {
 		createAddonDesc: "A Behavior Pack + a Resource Pack in one folder (.mcaddon).",
 		openTitle: "Open an existing pack",
 		openHint: "Upload a <strong>.mcpack</strong>, <strong>.mcaddon</strong> or <strong>.zip</strong> file to edit it.",
-		dropPrompt: '<span class="noto-color-emoji-regular">👋</span> Drag your pack here or <u>click</u> to select',
+		dropPrompt: 'Drag your pack here or <u>click</u> to select',
 		dropSub: ".mcpack, .mcaddon and .zip supported",
 
 		// Editor toolbar

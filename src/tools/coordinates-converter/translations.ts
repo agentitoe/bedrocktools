@@ -2,6 +2,11 @@ import type { TranslationTable } from '../../shared/ui';
 
 export const translations: TranslationTable = {
 	es: {
+		skipToContent: "Saltar al contenido",
+		footerColProject: "Proyecto",
+		footerLicense: "Licencias",
+		footerAllTools: "Todas las herramientas",
+		footerMadeWith: "Hecho con ♥ para la comunidad de Minecraft",
 		title: "Calculadora de Coordenadas Minecraft — Bedrock Tools",
 		heading: "Calculadora de Coordenadas Minecraft",
 		description: "Convierte coordenadas entre el Overworld y el Nether (relación 1:8)",
@@ -37,6 +42,11 @@ export const translations: TranslationTable = {
 		copyright: "Hecho con ♥️ por AgentitoE"
 	},
 	en: {
+		skipToContent: "Skip to content",
+		footerColProject: "Project",
+		footerLicense: "Licenses",
+		footerAllTools: "All tools",
+		footerMadeWith: "Made with ♥ for the Minecraft community",
 		title: "Minecraft Coordinates Calculator — Bedrock Tools",
 		heading: "Minecraft Coordinates Calculator",
 		description: "Convert coordinates between Overworld and Nether (1:8 ratio)",

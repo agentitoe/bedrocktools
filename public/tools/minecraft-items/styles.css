@@ -2,6 +2,12 @@
    Loaded by public/tools/minecraft-items/index.html. The base theme
    (CSS variables, top-bar, buttons) lives in public/assets/styles.css. */
 
+/* Page accent. The site has one accent (grass green) in the shared tokens;
+   this page carries a single secondary accent of its own — olive. */
+:root {
+	--tool-color: #79a82b;
+}
+
 body {
 	max-width: 1080px;
 }
@@ -23,11 +29,11 @@ body {
 	border: 1px solid var(--border);
 	color: var(--text);
 	padding: 8px 16px;
-	border-radius: 8px;
+	border-radius: var(--radius-sm);
 	cursor: pointer;
-	font-size: 0.85rem;
-	font-weight: 500;
-	transition: all .15s ease;
+	font-size: var(--fs-md);
+	font-weight: 600;
+	transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
 .filter-btn:hover {
 	border-color: var(--primary);
@@ -36,7 +42,7 @@ body {
 .filter-btn.active {
 	background: var(--primary);
 	border-color: var(--primary);
-	color: white;
+	color: var(--on-primary);
 }
 
 .search-container {
@@ -47,26 +53,27 @@ body {
 	width: 100%;
 	padding: 12px 44px 12px 16px;
 	border: 1px solid var(--border);
-	border-radius: 12px;
+	border-radius: var(--radius);
 	background: var(--surface);
 	color: var(--text);
-	font-size: 1rem;
-	box-shadow: var(--shadow);
+	font-size: var(--fs-base);
+	box-shadow: var(--shadow-xs);
 }
-.search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft-strong); }
 .search-icon {
 	position: absolute;
 	right: 16px;
 	top: 50%;
 	transform: translateY(-50%);
-	color: var(--muted);
-	font-size: 1.2rem;
+	color: var(--text-muted);
+	font-size: var(--fs-xl);
 }
 
 .stats-bar {
 	margin-bottom: 16px;
-	color: var(--muted);
-	font-size: 0.9rem;
+	color: var(--text-muted);
+	font-size: var(--fs-md);
+	font-variant-numeric: tabular-nums;
 }
 
 .items-grid {
@@ -78,7 +85,7 @@ body {
 .item-card {
 	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: 12px;
+	border-radius: var(--radius);
 	padding: 12px;
 	cursor: pointer;
 	transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
@@ -91,14 +98,18 @@ body {
 }
 .item-card:hover {
 	transform: translateY(-2px);
-	box-shadow: var(--shadow-lg);
-	border-color: var(--primary);
+	box-shadow: var(--shadow-sm);
+	border-color: var(--tool-color);
+}
+.item-card:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
 }
 .item-card.block-item {
-	border-color: #8b5cf6;
+	border-color: color-mix(in srgb, var(--tool-color) 55%, var(--border));
 }
 .item-card.block-item:hover {
-	border-color: #a855f7;
+	border-color: var(--tool-color);
 }
 .item-card img,
 .item-card canvas {
@@ -117,8 +128,8 @@ body {
 	width: 100%;
 }
 .item-name {
-	font-weight: 600;
-	font-size: 0.85rem;
+	font-weight: 650;
+	font-size: var(--fs-md);
 	color: var(--text);
 	white-space: nowrap;
 	overflow: hidden;
@@ -126,9 +137,10 @@ body {
 	max-width: 100%;
 }
 .item-id {
-	font-size: 0.7rem;
-	color: var(--muted);
-	font-family: monospace;
+	font-size: var(--fs-xs);
+	color: var(--text-muted);
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -138,21 +150,40 @@ body {
 	position: absolute;
 	top: 6px;
 	right: 6px;
-	font-size: 0.6rem;
+	font-size: var(--fs-xs);
 	padding: 2px 6px;
-	border-radius: 4px;
+	border-radius: var(--radius-xs);
 	font-weight: 600;
 }
 .block-badge {
-	background: #8b5cf6;
-	color: white;
+	background: color-mix(in srgb, var(--tool-color) 18%, var(--surface));
+	border: 1px solid color-mix(in srgb, var(--tool-color) 40%, transparent);
+	color: color-mix(in srgb, var(--tool-color) 70%, var(--text));
 }
 
-.loading, .no-results {
+/* Composed empty state: loading text on its own, a dashed container when a
+   search returns nothing, so an empty grid reads as intentional. */
+.loading {
 	grid-column: 1 / -1;
-	text-align: center;
-	padding: 3rem;
-	color: var(--muted);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 14px;
+	padding: 56px 24px;
+	color: var(--text-subtle);
+	font-size: var(--fs-base);
+}
+.no-results {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 14px;
+	padding: 56px 24px;
+	background: var(--surface-2);
+	border: 1px dashed var(--border-strong);
+	border-radius: var(--radius);
+	color: var(--text-muted);
 }
 
 /* Modal */
@@ -166,7 +197,7 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	z-index: 2000;
+	z-index: var(--z-overlay);
 	padding: 1rem;
 	backdrop-filter: blur(4px);
 	animation: fadeIn 0.2s ease;
@@ -176,7 +207,7 @@ body {
 .modal.recipe-modal {
 	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: 16px;
+	border-radius: var(--radius-lg);
 	max-width: 500px;
 	width: 100%;
 	max-height: 85vh;
@@ -193,16 +224,16 @@ body {
 	padding: 16px 20px;
 	border-bottom: 1px solid var(--border);
 }
-.modal-header h3 { margin: 0; font-size: 1.1rem; }
+.modal-header h3 { margin: 0; font-size: var(--fs-lg); }
 .modal-close {
 	background: transparent;
 	border: none;
-	color: var(--muted);
+	color: var(--text-muted);
 	font-size: 1.5rem;
 	cursor: pointer;
 	padding: 4px 8px;
 	line-height: 1;
-	border-radius: 8px;
+	border-radius: var(--radius-sm);
 	transition: background .15s ease, color .15s ease;
 }
 .modal-close:hover { background: var(--surface-hover); color: var(--text); }
@@ -225,7 +256,7 @@ body {
 	height: 48px;
 	background: var(--surface-hover);
 	border: 1px solid var(--border);
-	border-radius: 8px;
+	border-radius: var(--radius-sm);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -249,7 +280,7 @@ body {
 	border: 1px solid #000;
 	border-radius: 4px;
 	padding: 4px 8px;
-	font-size: 0.68rem;
+	font-size: var(--fs-xs);
 	font-weight: 600;
 	white-space: nowrap;
 	opacity: 0;
@@ -268,11 +299,11 @@ body {
 .recipe-card { margin-bottom: 16px; }
 .recipe-card:last-child { margin-bottom: 0; }
 .recipe-type-label {
-	font-size: 0.72rem;
+	font-size: var(--fs-xs);
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
-	color: var(--muted);
+	color: var(--text-muted);
 	margin-bottom: 6px;
 }
 .recipe-content {
@@ -284,26 +315,26 @@ body {
 	padding: 12px;
 	background: var(--surface-hover);
 	border: 1px solid var(--border);
-	border-radius: 12px;
+	border-radius: var(--radius);
 }
 .recipe-arrow {
-	font-size: 1.25rem;
-	color: var(--muted);
+	font-size: var(--fs-xl);
+	color: var(--text-muted);
 	margin: 0 2px;
 }
 .recipe-meta {
 	width: 100%;
-	font-size: 0.75rem;
-	color: var(--muted);
+	font-size: var(--fs-xs);
+	color: var(--text-muted);
 	margin-top: 4px;
 }
 .recipe-text-item {
-	font-size: 0.85rem;
+	font-size: var(--fs-md);
 	color: var(--text);
 	padding: 6px 10px;
 	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: 8px;
+	border-radius: var(--radius-sm);
 }
 .recipe-result {
 	display: flex;
@@ -313,7 +344,7 @@ body {
 	padding: 6px 10px;
 	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: 10px;
+	border-radius: var(--radius-sm);
 }
 .recipe-result img,
 .recipe-result canvas {
@@ -324,11 +355,11 @@ body {
 	filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 .result-info { display: flex; flex-direction: column; gap: 2px; }
-.result-name { font-weight: 600; font-size: 0.8rem; }
-.result-count { color: var(--muted); font-size: 0.75rem; }
+.result-name { font-weight: 600; font-size: var(--fs-sm); }
+.result-count { color: var(--text-muted); font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
 
-.recipe-note { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 12px; }
-.no-recipe { text-align: center; color: var(--muted); padding: 1rem; }
+.recipe-note { text-align: center; color: var(--text-muted); font-size: var(--fs-md); margin-top: 12px; }
+.no-recipe { text-align: center; color: var(--text-muted); padding: 1rem; }
 
 /* ===== Minecraft-style recipe GUI ===== */
 .mc-modal {

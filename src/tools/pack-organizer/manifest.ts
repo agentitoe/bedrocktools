@@ -7,8 +7,8 @@ export const manifest = {
 		es: "Organiza .mcpack/.mcaddon/.mcworld en la estructura com.mojang para Xbox.",
 		en: "Organize .mcpack/.mcaddon/.mcworld files into the com.mojang folder structure for Xbox.",
 	},
-	icon: "📦",
+	icon: "stack",
 	path: "/tools/pack-organizer",
-	color: "#10b981",
+	color: "#a8663c",
 	platforms: ["bedrock"],
 };

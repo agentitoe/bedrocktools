@@ -7,8 +7,8 @@ export const manifest = {
 		es: "Explora todos los items y bloques de Minecraft con sus recetas",
 		en: "Browse all Minecraft items and blocks with their recipes",
 	},
-	icon: "🧱",
+	icon: "blocks",
 	path: "/tools/minecraft-items",
-	color: "#f59e0b",
+	color: "#79a82b",
 	platforms: ["java", "bedrock"],
 };

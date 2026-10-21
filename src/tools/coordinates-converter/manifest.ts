@@ -7,8 +7,8 @@ export const manifest = {
 		es: "Convierte coordenadas entre el Overworld y el Nether",
 		en: "Convert coordinates between Overworld and Nether",
 	},
-	icon: "🗺️",
+	icon: "axes",
 	path: "/tools/coordinates-converter",
-	color: "#8b5cf6",
+	color: "#3f9ea6",
 	platforms: ["java", "bedrock"],
 };

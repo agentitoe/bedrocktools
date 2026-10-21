@@ -47,6 +47,18 @@ export interface UiHooks {
 	onApplyLang?: (lang: string) => void;
 }
 
+const ICON = {
+	globe: '<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-globe"/></svg>',
+	contrast: '<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-contrast"/></svg>',
+};
+
+/** Flag of a language, drawn as a tiny SVG instead of an emoji. */
+function flagSvg(code: string): string {
+	const id = code === 'es' ? 'flag-es' : code === 'en' ? 'flag-gb' : null;
+	if (!id) return '';
+	return `<svg class="flag" aria-hidden="true"><use href="/assets/icons.svg#${id}"/></svg>`;
+}
+
 function languageByCode(code: string): Language | undefined {
 	return LANGUAGES.find((l) => l.code === code);
 }
@@ -76,9 +88,16 @@ function setLangToggleLabel(lang: string): void {
 	const langToggle = document.getElementById('langToggle');
 	if (!langToggle) return;
 	const meta = languageByCode(lang);
-	const flag = meta ? meta.flag : '';
 	const label = meta ? meta.label : lang.toUpperCase();
-	langToggle.innerHTML = `<span class="noto-color-emoji-regular">${flag}</span> <span class="label">${label}</span>`;
+	langToggle.textContent = '';
+	const iconWrap = document.createElement('span');
+	iconWrap.innerHTML = ICON.globe;
+	const labelSpan = document.createElement('span');
+	labelSpan.className = 'label';
+	labelSpan.textContent = label;
+	langToggle.append(iconWrap, labelSpan);
+	langToggle.setAttribute('aria-expanded', 'false');
+	langToggle.setAttribute('aria-haspopup', 'true');
 }
 
 /**
@@ -86,7 +105,7 @@ function setLangToggleLabel(lang: string): void {
  * translated are shown disabled, so the switcher always reflects what the page
  * actually supports.
  */
-function buildLangMenu(translations: TranslationTable): void {
+function buildLangMenu(translations: TranslationTable, activeLang: string): void {
 	const dropdown = document.getElementById('langDropdown');
 	if (!dropdown) return;
 	dropdown.innerHTML = '';
@@ -97,7 +116,8 @@ function buildLangMenu(translations: TranslationTable): void {
 		btn.setAttribute('role', 'menuitem');
 		btn.dataset.lang = meta.code;
 		btn.title = meta.name;
-		btn.innerHTML = `<span class="noto-color-emoji-regular">${meta.flag}</span> ${meta.label}`;
+		btn.innerHTML = `${flagSvg(meta.code)}<span>${meta.name}</span><span class="lang-code">${meta.label}</span>`;
+		btn.setAttribute('aria-current', meta.code === activeLang ? 'true' : 'false');
 		if (!translations[meta.code]) {
 			btn.disabled = true;
 			btn.setAttribute('aria-disabled', 'true');
@@ -161,19 +181,16 @@ export function initTheme(): void {
 	const savedTheme = localStorage.getItem('theme');
 	if (savedTheme === 'dark') {
 		document.documentElement.setAttribute('data-theme', 'dark');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">🌙</span>';
 	} else if (savedTheme === 'light') {
 		document.documentElement.removeAttribute('data-theme');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">☀️</span>';
 	} else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
 		document.documentElement.setAttribute('data-theme', 'dark');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">🌙</span>';
 		localStorage.setItem('theme', 'dark');
 	} else {
 		document.documentElement.removeAttribute('data-theme');
-		themeToggle.innerHTML = '<span class="noto-color-emoji-regular">☀️</span>';
 		localStorage.setItem('theme', 'light');
 	}
+	themeToggle.innerHTML = ICON.contrast;
 }
 
 export function initThemeToggle(translations: TranslationTable): void {
@@ -184,11 +201,9 @@ export function initThemeToggle(translations: TranslationTable): void {
 		if (isDark) {
 			document.documentElement.removeAttribute('data-theme');
 			localStorage.setItem('theme', 'light');
-			themeToggle.innerHTML = '<span class="noto-color-emoji-regular">☀️</span>';
 		} else {
 			document.documentElement.setAttribute('data-theme', 'dark');
 			localStorage.setItem('theme', 'dark');
-			themeToggle.innerHTML = '<span class="noto-color-emoji-regular">🌙</span>';
 		}
 		applyTitles(resolveLang(translations, getLang()), translations);
 	});
@@ -198,30 +213,51 @@ export function initDropdowns(translations: TranslationTable, hooks?: UiHooks): 
 	const langToggle = document.getElementById('langToggle');
 	const langDropdown = document.getElementById('langDropdown');
 	if (!langToggle || !langDropdown) return;
+
+	const close = () => {
+		langDropdown.classList.remove('open');
+		langToggle.setAttribute('aria-expanded', 'false');
+	};
+
 	langToggle.addEventListener('click', (e) => {
 		e.stopPropagation();
-		langDropdown.classList.toggle('open');
+		const willOpen = !langDropdown.classList.contains('open');
+		langDropdown.classList.toggle('open', willOpen);
+		langToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
 	});
+
 	document.querySelectorAll('.lang-option').forEach((option) => {
 		option.addEventListener('click', () => {
 			const lang = option.getAttribute('data-lang');
 			if (lang === null) return;
 			setLang(lang, translations, hooks);
-			langDropdown.classList.remove('open');
+			for (const other of langDropdown.querySelectorAll('.lang-option')) {
+				other.setAttribute('aria-current', other === option ? 'true' : 'false');
+			}
+			close();
 		});
 	});
+
 	document.addEventListener('click', (e) => {
 		const target = e.target;
 		if (target instanceof Node && !langDropdown.contains(target) && target !== langToggle) {
-			langDropdown.classList.remove('open');
+			close();
 		}
+	});
+
+	// Escape closes the menu and puts focus back on the button that opened it.
+	document.addEventListener('keydown', (e) => {
+		if (e.key !== 'Escape' || !langDropdown.classList.contains('open')) return;
+		close();
+		langToggle.focus();
 	});
 }
 
 /** Wire up theme + language for a page. Returns the active language. */
 export function initUi(translations: TranslationTable, hooks?: UiHooks): string {
-	buildLangMenu(translations);
 	const lang = resolveLang(translations, getLang());
+	buildLangMenu(translations, lang);
+	setLangToggleLabel(lang);
 	// Persist the resolved language so later getLang() calls (e.g. in event
 	// handlers) return a language this page actually supports.
 	localStorage.setItem('lang', lang);

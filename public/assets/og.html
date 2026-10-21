@@ -1,0 +1,194 @@
+<!doctype html>
+<!-- Shared source for public/assets/og.png. Run `bun scripts/build-og.mjs`
+     to rasterize this card at 1200x630. Self-contained on purpose: it is
+     opened over file:// so it can be previewed without the dev server. -->
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=1200, initial-scale=1" />
+		<title>Bedrock Tools — Social card</title>
+		<!-- Standalone: fonts inlined so the shared stylesheet (which constrains
+		     body width) is not loaded here. -->
+		<style>
+			@font-face {
+				font-family: "Outfit";
+				src: url("../fonts/outfit-latin.woff2") format("woff2");
+				font-weight: 400 800;
+				font-style: normal;
+				font-display: swap;
+			}
+
+			@font-face {
+				font-family: "Press Start 2P";
+				src: url("../fonts/press-start-2p-latin.woff2") format("woff2");
+				font-weight: 400;
+				font-style: normal;
+				font-display: swap;
+			}
+
+			:root {
+				--paper: #f4f7f3;
+				--brand: #54b932;
+				--brand-dark: #419b25;
+				--ink: #10150f;
+				--muted: #5b6559;
+				--gold: #f5a623;
+			}
+
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+			}
+
+			body {
+				width: 1200px;
+				height: 630px;
+				overflow: hidden;
+				position: relative;
+				background-color: var(--paper);
+				color: var(--ink);
+				font-family: "Outfit", system-ui, sans-serif;
+				-webkit-font-smoothing: antialiased;
+			}
+
+			/* Ambient backdrop, matching the home page. */
+			body::before {
+				content: "";
+				position: absolute;
+				inset: 0;
+				background-image:
+					radial-gradient(900px 500px at 8% -20%, rgb(84 185 50 / 0.2), transparent 62%),
+					radial-gradient(800px 460px at 96% 6%, rgb(245 166 35 / 0.14), transparent 58%),
+					linear-gradient(rgb(16 21 15 / 0.045) 1px, transparent 1px),
+					linear-gradient(90deg, rgb(16 21 15 / 0.045) 1px, transparent 1px);
+				background-size: auto, auto, 48px 48px, 48px 48px;
+			}
+
+			/* Floating items, same real textures as the hero. */
+			.og-item {
+				position: absolute;
+				width: var(--s, 80px);
+				height: var(--s, 80px);
+				image-rendering: pixelated;
+				filter: drop-shadow(0 10px 12px rgb(16 21 15 / 0.18));
+			}
+
+			.card {
+				position: absolute;
+				inset: 0;
+				padding: 88px;
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+			}
+
+			.card > * {
+				flex-shrink: 0;
+			}
+
+			.wordmark {
+				display: flex;
+				flex-direction: column;
+				font-family: "Press Start 2P", "JetBrains Mono", monospace;
+				font-size: 78px;
+				line-height: 1.02;
+				letter-spacing: 0.04em;
+			}
+
+			.wordmark .line-2 {
+				color: var(--brand);
+			}
+
+			.rule {
+				width: 220px;
+				height: 6px;
+				border-radius: 3px;
+				background: var(--brand);
+				margin: 34px 0 0;
+			}
+
+			.claim {
+				margin: 26px 0 0;
+				font-size: 33px;
+				font-weight: 650;
+				line-height: 1.35;
+				max-width: 640px;
+			}
+
+			.stats {
+				margin: 22px 0 0;
+				font-size: 26px;
+				font-weight: 550;
+				color: var(--muted);
+			}
+
+			.stats strong {
+				color: var(--ink);
+				font-variant-numeric: tabular-nums;
+			}
+
+			.stats .dot {
+				color: var(--brand);
+				margin-inline: 10px;
+			}
+
+			.chips {
+				display: flex;
+				gap: 14px;
+				margin-top: 34px;
+			}
+
+			.chip {
+				display: inline-flex;
+				align-items: center;
+				gap: 10px;
+				padding: 13px 22px;
+				border-radius: 999px;
+				font-size: 23px;
+				font-weight: 700;
+				line-height: 1.1;
+			}
+
+			.chip-solid {
+				background: var(--ink);
+				color: #eef3ec;
+			}
+
+			.chip-line {
+				background: transparent;
+				color: var(--ink);
+				box-shadow: inset 0 0 0 1px rgb(16 21 15 / 0.18);
+			}
+		</style>
+	</head>
+	<body>
+		<img class="og-item" src="../textures/item/diamond_sword.webp" alt="" width="120" height="120" style="--s:120px; left:840px; top:66px" />
+		<img class="og-item" src="../textures/item/golden_apple.webp" alt="" width="64" height="64" style="--s:64px; left:1000px; top:150px" />
+		<img class="og-item" src="../textures/item/ender_pearl.webp" alt="" width="48" height="48" style="--s:48px; left:1090px; top:340px" />
+		<img class="og-item" src="../textures/item/netherite_ingot.webp" alt="" width="40" height="40" style="--s:40px; left:800px; top:380px" />
+
+		<div class="card">
+			<div class="wordmark">
+				<span class="line-1">BEDROCK</span>
+				<span class="line-2">TOOLS</span>
+			</div>
+			<div class="rule" aria-hidden="true"></div>
+			<p class="claim">Herramientas para Minecraft Java y Bedrock</p>
+			<p class="stats">
+				<strong>1.769</strong> objetos<span class="dot">·</span><strong>7</strong> herramientas<span class="dot">·</span
+				><strong>0</strong> archivos subidos
+			</p>
+			<div class="chips">
+				<span class="chip chip-solid">Corre en tu navegador</span>
+				<span class="chip chip-line">Gratis, siempre</span>
+			</div>
+		</div>
+	</body>
+</html>

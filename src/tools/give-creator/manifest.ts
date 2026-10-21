@@ -7,8 +7,8 @@ export const manifest = {
 		es: "Crea comandos /give personalizados para Minecraft Java y Bedrock",
 		en: "Create custom /give commands for Minecraft Java and Bedrock",
 	},
-	icon: "🎁",
+	icon: "cube",
 	path: "/tools/give-creator",
-	color: "#5cf6e9",
+	color: "#cf6a4a",
 	platforms: ["java", "bedrock"],
 };

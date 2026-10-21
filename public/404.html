@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<title>Página no encontrada — Bedrock Tools</title>
+		<link rel="icon" type="image/webp" href="/assets/favicon.svg" />
+		<link rel="preload" as="font" type="font/woff2" href="/fonts/outfit-latin.woff2" crossorigin />
+		<link rel="stylesheet" href="/assets/styles.css" />
+		<style>
+			/* The 404 page has no script bundle, so its copy lives here. */
+			.notfound {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 18px;
+				min-height: 70dvh;
+				justify-content: center;
+				max-width: 560px;
+				margin: 0 auto;
+				padding: calc(var(--topbar-h) + 24px) 24px 64px;
+			}
+
+			.notfound-code {
+				font-family: var(--font-brand);
+				font-size: clamp(2.5rem, 1rem + 8vw, 4.5rem);
+				line-height: 1;
+				color: var(--primary);
+			}
+
+			.notfound h1 {
+				margin: 0;
+			}
+
+			.notfound p {
+				color: var(--text-muted);
+				font-size: var(--fs-lg);
+				line-height: 1.6;
+			}
+
+			.notfound-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 12px;
+				margin-top: 6px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="top-bar">
+			<a class="icon-btn" href="/" aria-label="Volver al inicio">
+				<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-home" /></svg>
+				<span class="label">Inicio</span>
+			</a>
+		</div>
+		<main class="notfound" id="main">
+			<span class="notfound-code">404</span>
+			<h1>Esta página no existe</h1>
+			<p>
+				Puede que el enlace esté mal escrito o que la herramienta se haya movido. Vuelve al
+				inicio y elige una de las siete herramientas.
+			</p>
+			<div class="notfound-actions">
+				<a class="btn btn-primary" href="/">
+					<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-home" /></svg>
+					Ir al inicio
+				</a>
+				<a class="btn btn-quiet" href="/tools/minecraft-items">
+					<svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#i-blocks" /></svg>
+					Ver items y bloques
+				</a>
+			</div>
+		</main>
+	</body>
+</html>

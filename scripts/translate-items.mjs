@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-const LANG_URL = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/26.1/assets/minecraft/lang/es_es.json';
+const LANG_URL = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/26.3/assets/minecraft/lang/es_es.json';
 
 async function fetchLang() {
 	const res = await fetch(LANG_URL, { headers: { Accept: 'application/json' } });

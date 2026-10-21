@@ -1,8 +1,14 @@
-// Java → Bedrock item ID resolution for the /give Command Generator.
-// Source: minecraft.wiki "Bedrock Edition data values" (Items/Items2/Blocks/
-// Blocks2, April 2025 snapshot). After the 1.20.30 ID renames most names match
-// Java; this module only lists the remaining differences and the items that
-// do not exist in Bedrock at all.
+// Java → Bedrock item resolution for the /give Command Generator.
+//
+// Item NAMES come from the official Geyser mappings (public/data/geyser-item-
+// map.json, fetched at tool startup from https://github.com/GeyserMC/mappings):
+// every Bedrock name difference is listed there by bedrock_identifier.
+//
+// What Geyser cannot provide stays local:
+//  • Availability — Geyser lists every Java item (falling back to the Java name
+//    when Bedrock uses the same identifier), so it cannot say whether an item
+//    is missing in Bedrock. UNAVAILABLE below is the Java-only item list.
+//  • Data values — potion/tipped-arrow metadata and the cauldron states.
 
 export interface BedrockItemResolution {
 	/** Bedrock item name (no namespace). */
@@ -15,72 +21,60 @@ export interface BedrockItemResolution {
 	renamed?: boolean;
 }
 
-/** Java item name → Bedrock item name (names that still differ). */
-const RENAMES: Record<string, string> = {
-	// Blocks
-	snow: 'snow_layer',                                  // Java snow layer
-	snow_block: 'snow',                                  // Bedrock "snow" is the full block
-	spawner: 'mob_spawner',                              // Java 26.1 rename of monster_spawner
+/** Shape of the generated Geyser map (see scripts/fetch-geyser-mappings.mjs). */
+export interface GeyserItemMap {
+	source?: string;
+	commit?: string;
+	renames: Record<string, string>;
+}
+
+let geyserMap: GeyserItemMap | null = null;
+
+/**
+ * Load the Geyser mappings (no argument: fetch from the site assets; with an
+ * argument: inject a pre-parsed map, used by tests).
+ */
+export async function loadBedrockItemMap(map?: GeyserItemMap): Promise<void> {
+	if (map) {
+		geyserMap = map;
+		return;
+	}
+	try {
+		const res = await fetch('/data/geyser-item-map.json');
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		const data = (await res.json()) as GeyserItemMap;
+		if (data && typeof data.renames === 'object') geyserMap = data;
+	} catch (err) {
+		// Without the map every item falls back to its Java name; the tool
+		// still works for the (vast) majority of items that share names.
+		console.error('Failed to load Geyser item map:', err);
+	}
+}
+
+export function isBedrockItemMapLoaded(): boolean {
+	return geyserMap !== null;
+}
+
+/**
+ * Renames for Java names Geyser does not list yet (old Java names Geyser
+ * dropped, and block states that exist as items only in Java). Geyser wins
+ * whenever it knows the name; these entries are a bridge until it does.
+ */
+const EXTRA_RENAMES: Record<string, string> = {
+	// Java 26.1 renamed monster_spawner → spawner; Geyser only tracks "spawner".
 	monster_spawner: 'mob_spawner',
-	end_stone_bricks: 'end_bricks',
-	magma_block: 'magma',
-	note_block: 'noteblock',
-	nether_bricks: 'nether_brick',
-	red_nether_bricks: 'red_nether_brick',
-	bricks: 'brick_block',
-	slime_block: 'slime',
-	melon: 'melon_block',
-	lily_pad: 'waterlily',
-	dead_bush: 'deadbush',
-	cobweb: 'web',
-	nether_quartz_ore: 'quartz_ore',
-	rooted_dirt: 'dirt_with_roots',
-	flowering_azalea_leaves: 'azalea_leaves_flowered',
-	small_dripleaf: 'small_dripleaf_block',
-	jack_o_lantern: 'lit_pumpkin',
-	terracotta: 'hardened_clay',
-	dirt_path: 'grass_path',
-	oak_button: 'wooden_button',
-	oak_pressure_plate: 'wooden_pressure_plate',
-	oak_door: 'wooden_door',
-	oak_trapdoor: 'trapdoor',
-	oak_fence_gate: 'fence_gate',
-	powered_rail: 'golden_rail',
-	cobblestone_stairs: 'stone_stairs',
-	prismarine_brick_stairs: 'prismarine_bricks_stairs',
-	end_stone_brick_stairs: 'end_brick_stairs',
-	light_gray_glazed_terracotta: 'silver_glazed_terracotta',
-	light: 'light_block',
-	water_cauldron: 'cauldron',
-	powder_snow_cauldron: 'cauldron',
-	// Items
-	item_frame: 'frame',
-	glow_item_frame: 'glow_frame',
-	map: 'empty_map',
+	// Java renamed turtle_scute → scute; Bedrock still uses the old name.
 	scute: 'turtle_scute',
-	frogspawn: 'frog_spawn',
-	tipped_arrow: 'arrow',
-	zombified_piglin_spawn_egg: 'zombie_pigman_spawn_egg',
+	// Leveled-cauldron block states (not items in Java, but accepted as input).
+	water_cauldron: 'cauldron',
+	powder_snow_cauldron: 'cauldron'
 };
-
-/** Fixed data values for items whose Bedrock variant needs one. */
-const DATA_VALUES: Record<string, number> = {
-	cauldron: 0,
-	water_cauldron: 1,
-	powder_snow_cauldron: 3,
-	tipped_arrow: 6, // first tipped variant (Arrow of Night Vision); range is 6-47
-};
-
-/** Bedrock data value per dye color (beds, banners). Order = data value. */
-const COLOR_ORDER = [
-	'white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink',
-	'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black',
-];
-const COLOR_DATA = new Map(COLOR_ORDER.map((c, i) => [c, i]));
 
 /**
  * Java items that do not exist in Bedrock (computed against the April 2025
  * data values; mostly Java 26.1 "Copper Age" content Bedrock has not received).
+ * Note: Geyser cannot derive this list — it maps every Java item to *some*
+ * Bedrock identifier.
  */
 const UNAVAILABLE = new Set([
 	'white_harness', 'orange_harness', 'magenta_harness', 'light_blue_harness',
@@ -105,8 +99,23 @@ const UNAVAILABLE = new Set([
 	'music_disc_lava_chicken', 'music_disc_tears',
 	'iron_nautilus_armor', 'golden_nautilus_armor', 'diamond_nautilus_armor',
 	'netherite_nautilus_armor', 'copper_nautilus_armor',
-	'glow_berries',
+	'glow_berries'
 ]);
+
+/** Fixed data values for items whose Bedrock variant needs one. */
+const DATA_VALUES: Record<string, number> = {
+	cauldron: 0,
+	water_cauldron: 1,
+	powder_snow_cauldron: 3,
+	tipped_arrow: 6 // first tipped variant (Arrow of Night Vision); range is 6-47
+};
+
+/** Bedrock data value per dye color (beds, banners). Order = data value. */
+const COLOR_ORDER = [
+	'white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink',
+	'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black',
+];
+const COLOR_DATA = new Map(COLOR_ORDER.map((c, i) => [c, i]));
 
 /**
  * Bedrock potion data values (regular / extended / level II). Splash adds 64,
@@ -132,14 +141,14 @@ const POTION_EFFECT_DATA: Record<string, [number, number, number]> = {
 	wind_charged: [43, -1, -1],
 	weaving: [44, -1, -1],
 	oozing: [45, -1, -1],
-	infested: [46, -1, -1],
+	infested: [46, -1, -1]
 };
 
 const POTION_BASE_DATA: Record<string, number> = {
 	water_bottle: 0,
 	mundane_potion: 1,
 	thick_potion: 3,
-	awkward_potion: 4,
+	awkward_potion: 4
 };
 
 /** One selectable entry for the Bedrock potion / tipped-arrow dropdown. */
@@ -157,7 +166,7 @@ const POTION_BASES: { base: string; data: number }[] = [
 	{ base: 'mundane', data: 1 },
 	{ base: 'long_mundane', data: 2 },
 	{ base: 'thick', data: 3 },
-	{ base: 'awkward', data: 4 },
+	{ base: 'awkward', data: 4 }
 ];
 
 /**
@@ -229,6 +238,15 @@ function resolveColored(name: string): BedrockItemResolution | null {
 	return null;
 }
 
+/** Bedrock name for a Java item: Geyser first, local bridge names second. */
+function bedrockNameFor(name: string): { id: string; renamed: boolean } {
+	const mapped = geyserMap?.renames?.[name];
+	if (mapped) return { id: mapped, renamed: mapped !== name };
+	const extra = EXTRA_RENAMES[name];
+	if (extra) return { id: extra, renamed: extra !== name };
+	return { id: name, renamed: false };
+}
+
 /**
  * Resolve a Java item ID (with or without the minecraft: prefix) to the item
  * Bedrock /give should receive. Unknown names pass through unchanged.
@@ -243,19 +261,11 @@ export function resolveBedrockItem(javaId: string): BedrockItemResolution {
 	const colored = resolveColored(name);
 	if (colored) return colored;
 
-	const renamed = RENAMES[name];
-	if (renamed) {
-		return {
-			id: renamed,
-			data: DATA_VALUES[name],
-			available: true,
-			renamed: true,
-		};
-	}
-
 	if (UNAVAILABLE.has(name)) return { id: name, available: false };
 
-	// Same name in Bedrock; still apply a fixed data value when one exists.
+	const { id, renamed } = bedrockNameFor(name);
 	const data = DATA_VALUES[name];
-	return data !== undefined ? { id: name, data, available: true } : { id: name, available: true };
+	return data !== undefined
+		? { id, data, available: true, ...(renamed ? { renamed } : {}) }
+		: { id, available: true, ...(renamed ? { renamed } : {}) };
 }

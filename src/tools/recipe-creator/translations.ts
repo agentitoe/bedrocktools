@@ -2,8 +2,13 @@ import type { TranslationTable } from './types';
 
 export const translations: TranslationTable = {
 	es: {
+		skipToContent: "Saltar al contenido",
+		footerColProject: "Proyecto",
+		footerLicense: "Licencias",
+		footerAllTools: "Todas las herramientas",
+		footerMadeWith: "Hecho con ♥ para la comunidad de Minecraft",
 		title: "Creador de Recetas — Bedrock Tools",
-		heading: "⚒️ Creador de Recetas",
+		heading: "Creador de Recetas",
 		description: "Crea recetas de crafteo y horno para Minecraft Bedrock y Java. Expórtalas como addon .mcpack (Bedrock) o como Data Pack (Java).",
 		tabShaped: "Con forma",
 		tabShapeless: "Sin forma",
@@ -66,8 +71,13 @@ export const translations: TranslationTable = {
 		copyright: "Hecho con ♥️ por AgentitoE"
 	},
 	en: {
+		skipToContent: "Skip to content",
+		footerColProject: "Project",
+		footerLicense: "Licenses",
+		footerAllTools: "All tools",
+		footerMadeWith: "Made with ♥ for the Minecraft community",
 		title: "Recipe Creator — Bedrock Tools",
-		heading: "⚒️ Recipe Creator",
+		heading: "Recipe Creator",
 		description: "Create crafting and furnace recipes for Minecraft Bedrock and Java. Export them as a .mcpack addon (Bedrock) or as a Data Pack (Java).",
 		tabShaped: "Shaped",
 		tabShapeless: "Shapeless",

@@ -16,7 +16,7 @@ body { max-width: 1080px; }
 	gap: 6px;
 	background: var(--surface-2);
 	border: 1px solid var(--border);
-	border-radius: 12px;
+	border-radius: var(--radius-sm);
 	padding: 4px;
 	margin: 6px 0 18px;
 }
@@ -25,10 +25,10 @@ body { max-width: 1080px; }
 	align-items: center;
 	gap: 7px;
 	padding: 9px 18px;
-	border-radius: 9px;
+	border-radius: var(--radius-sm);
 	border: none;
 	background: transparent;
-	color: var(--muted);
+	color: var(--text-muted);
 	font-weight: 700;
 	font-size: 0.9rem;
 	cursor: pointer;
@@ -56,7 +56,7 @@ body { max-width: 1080px; }
 	flex: 1;
 	min-width: 0;
 }
-.recipe-empty { color: var(--muted); font-size: 0.9rem; }
+.recipe-empty { color: var(--text-muted); font-size: 0.9rem; }
 .recipe-chip {
 	display: inline-flex;
 	align-items: center;
@@ -65,11 +65,11 @@ body { max-width: 1080px; }
 	border: 1px solid var(--border);
 	color: var(--text);
 	padding: 8px 10px;
-	border-radius: 11px;
+	border-radius: var(--radius-sm);
 	cursor: pointer;
 	font-size: 0.85rem;
 	font-weight: 600;
-	transition: all .15s ease;
+	transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
 .recipe-chip:hover { border-color: var(--primary); }
 .recipe-chip.active {
@@ -90,7 +90,7 @@ body { max-width: 1080px; }
 	justify-content: center;
 	width: 18px;
 	height: 18px;
-	border-radius: 6px;
+	border-radius: var(--radius-xs);
 	font-size: 0.7rem;
 	font-weight: 700;
 	line-height: 1;
@@ -104,11 +104,11 @@ body { max-width: 1080px; }
 	border: 1px dashed var(--border-strong);
 	color: var(--text);
 	padding: 8px 14px;
-	border-radius: 11px;
+	border-radius: var(--radius-sm);
 	cursor: pointer;
 	font-weight: 600;
 	font-size: 0.85rem;
-	transition: all .15s ease;
+	transition: color .15s ease, background .15s ease, border-color .15s ease;
 	white-space: nowrap;
 }
 .add-recipe-btn:hover { border-color: var(--primary); color: var(--primary); }
@@ -138,7 +138,7 @@ body { max-width: 1080px; }
 	background: var(--surface-hover);
 }
 .import-ico { font-size: 1.6rem; line-height: 1; }
-.import-hint { margin: 0; color: var(--muted); font-size: 0.88rem; text-align: center; }
+.import-hint { margin: 0; color: var(--text-muted); font-size: 0.88rem; text-align: center; }
 .import-actions {
 	display: flex;
 	gap: 10px;
@@ -154,9 +154,9 @@ body { max-width: 1080px; }
 .btn-ghost {
 	background: transparent;
 	border: 1px solid transparent;
-	color: var(--muted);
+	color: var(--text-muted);
 }
-.btn-ghost:hover { color: var(--error); border-color: var(--border); }
+.btn-ghost:hover { color: var(--danger); border-color: var(--border); }
 
 .editor-card {
 	background: var(--surface);
@@ -166,7 +166,7 @@ body { max-width: 1080px; }
 	box-shadow: var(--shadow);
 }
 .editor-empty { text-align: center; padding: 24px 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.editor-empty p { color: var(--muted); margin: 0; }
+.editor-empty p { color: var(--text-muted); margin: 0; }
 
 .type-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .type-tab {
@@ -174,11 +174,11 @@ body { max-width: 1080px; }
 	border: 1px solid var(--border);
 	color: var(--text);
 	padding: 9px 16px;
-	border-radius: 11px;
+	border-radius: var(--radius-sm);
 	cursor: pointer;
 	font-size: 0.88rem;
 	font-weight: 600;
-	transition: all .15s ease;
+	transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
 .type-tab:hover { border-color: var(--primary); background: var(--surface-hover); }
 .type-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
@@ -190,21 +190,10 @@ body { max-width: 1080px; }
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: var(--muted);
+	color: var(--text-muted);
 	margin-bottom: 8px;
 }
-.text-input {
-	width: 100%;
-	padding: 10px 14px;
-	border: 1px solid var(--border);
-	border-radius: 10px;
-	background: var(--surface-2);
-	color: var(--text);
-	font-size: 0.95rem;
-	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.text-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
-.hint { font-size: 0.76rem; color: var(--muted); margin: 6px 0 0; }
+/* .hint, .text-input and .station-select come from public/assets/styles.css */
 
 .gui-wrap { display: flex; justify-content: center; }
 
@@ -271,7 +260,7 @@ body { max-width: 1080px; }
 .stepper-btn {
 	width: 30px;
 	height: 30px;
-	border-radius: 8px;
+	border-radius: var(--radius-sm);
 	border: 1px solid var(--border);
 	background: var(--surface);
 	color: var(--text);
@@ -288,16 +277,6 @@ body { max-width: 1080px; }
 	color: var(--text);
 	font-variant-numeric: tabular-nums;
 }
-.station-select {
-	min-width: 220px;
-	padding: 10px 12px;
-	border: 1px solid var(--border);
-	border-radius: 10px;
-	background: var(--surface);
-	color: var(--text);
-	font-size: 0.95rem;
-	cursor: pointer;
-}
 
 /* Export card */
 .export-card {
@@ -312,16 +291,15 @@ body { max-width: 1080px; }
 .version-row .station-select { width: 100%; }
 .export-btn { width: 100%; margin-top: 18px; }
 #status { margin-top: 14px; }
-.status-card { padding: 14px 16px; }
 code {
 	background: var(--surface-2);
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: var(--radius-xs);
 	padding: 1px 6px;
 	font-size: 0.82rem;
 }
 
-.loading { text-align: center; color: var(--muted); padding: 2rem; }
+.loading { text-align: center; color: var(--text-muted); padding: 2rem; }
 
 /* Picker */
 .picker-overlay {
@@ -331,7 +309,7 @@ code {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	z-index: 2000;
+	z-index: var(--z-overlay);
 	padding: 1rem;
 	backdrop-filter: blur(4px);
 	animation: fadeIn 0.18s ease;
@@ -340,7 +318,7 @@ code {
 .picker {
 	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: 18px;
+	border-radius: var(--radius-lg);
 	width: 100%;
 	max-width: 720px;
 	max-height: 85vh;
@@ -361,24 +339,24 @@ code {
 	background: var(--surface-2);
 	border: 1px solid var(--border);
 	color: var(--text);
-	border-radius: 9px;
+	border-radius: var(--radius-sm);
 	padding: 7px 12px;
 	cursor: pointer;
 	font-size: 0.85rem;
 	font-weight: 600;
 }
-.picker-clear:hover { color: var(--error); border-color: var(--error); }
-.picker-close:hover { color: var(--error); border-color: var(--error); }
+.picker-clear:hover { color: var(--danger); border-color: var(--danger); }
+.picker-close:hover { color: var(--danger); border-color: var(--danger); }
 .picker-search {
 	margin: 12px 16px 0;
 	padding: 11px 14px;
 	border: 1px solid var(--border);
-	border-radius: 10px;
+	border-radius: var(--radius-sm);
 	background: var(--surface-2);
 	color: var(--text);
 	font-size: 0.95rem;
 }
-.picker-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.picker-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft-strong); }
 .picker-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -393,7 +371,7 @@ code {
 	padding: 8px;
 	background: var(--surface-2);
 	border: 1px solid var(--border);
-	border-radius: 10px;
+	border-radius: var(--radius-sm);
 	cursor: pointer;
 	color: var(--text);
 	text-align: left;
@@ -409,8 +387,21 @@ code {
 }
 .picker-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .picker-name { font-weight: 600; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.picker-id { font-size: 0.68rem; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.picker-empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 2rem; }
+.picker-id { font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-empty { grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 2rem; }
+
+/* Keyboard focus rings for this page's interactive elements. */
+.type-tab:focus-visible,
+.recipe-chip:focus-visible,
+.add-recipe-btn:focus-visible,
+.import-drop:focus-visible,
+.btn:focus-visible,
+.picker-item:focus-visible,
+.gui-slot-btn:focus-visible,
+.stepper-btn:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
 
 @media (max-width: 560px) {
 	.tool-container { padding: 1rem; padding-top: 72px; }

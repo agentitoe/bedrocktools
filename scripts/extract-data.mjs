@@ -7,6 +7,17 @@ import { writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync, readFile
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
+import {
+	buildBannerModel,
+	buildBedModel,
+	buildChestModel,
+	buildDecoratedPotModel,
+	buildGolemStatueModel,
+	buildHeadModel,
+	buildShieldModel,
+	DRAGON_HEAD_REGIONS,
+	HEAD_REGIONS
+} from './special-blocks.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -14,16 +25,24 @@ const publicDir = join(root, 'public');
 const dataDir = join(publicDir, 'data');
 const texturesDir = join(publicDir, 'textures');
 
-// Use InventivetalentDev/minecraft-assets branch 26.1 for models and textures
-const ASSET_BASE = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/26.1/assets/minecraft';
+// Use InventivetalentDev/minecraft-assets branch 26.3 for models and textures.
+// The branch is the single source of truth: item catalog (items/_all.json),
+// block/item models, textures, vanilla recipe JSONs and item tags.
+// (minecraft-data's newest *published data* is 26.1, so it is only used below
+// as a fallback for display names and stack sizes, never as the catalog.)
+const MC_VERSION = '26.3';
+const ASSET_BASE = `https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/${MC_VERSION}/assets/minecraft`;
 const MODEL_BASE = `${ASSET_BASE}/models`;        // models/block, models/item
-const ITEMS_BASE = `${ASSET_BASE}/items`;         // new 26.1 item model definitions
+const ITEMS_BASE = `${ASSET_BASE}/items`;         // item model definitions (_all.json = full catalog)
 const BLOCKS_TEXTURE_BASE = `${ASSET_BASE}/textures/block`;
 const ITEMS_TEXTURE_BASE = `${ASSET_BASE}/textures/item`;
 const ENTITY_TEXTURE_BASE = `${ASSET_BASE}/textures/entity`;
-const DATA_BASE = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/26.1/data/minecraft';
+const DATA_BASE = `https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/${MC_VERSION}/data/minecraft`;
 const RECIPE_BASE = `${DATA_BASE}/recipe`;
 const ITEM_TAG_BASE = `${DATA_BASE}/tags/item`;
+// generatePotions() assigns synthetic potion ids starting here; vanilla item
+// ids must stay below this bound so the two spaces never collide.
+const POTION_ID_BASE = 900000;
 
 // Bun uses its own HTTP client with built-in pooling
 const FETCH_OPTS = { headers: { 'Accept': 'application/json, image/png' } };
@@ -49,34 +68,6 @@ const HEAD_SKINS = {
 	piglin: 'textures/entity/piglin/piglin.png',
 	dragon: 'textures/entity/enderdragon/dragon.png',
 	player: 'textures/entity/player/wide/steve.png'
-};
-
-// Standard Minecraft skin head UV regions (pixel coordinates within the skin).
-// For humanoid skins (64x64 / 64x32) these are always the same top-left region.
-// face -> [x1, y1, x2, y2]
-//
-// NOTE: the face (eyes) lives on the entity model's +Z (= "south" in block-model
-// terms) face. The isometric renderer shows the +Z face as the front, so the
-// face region must be assigned to "south" — assigning it to "north" puts the
-// back of the head toward the camera (heads looked "reversed" with no eyes).
-const HEAD_REGIONS = {
-	up: [8, 0, 16, 8],       // top of head
-	down: [16, 0, 24, 8],    // bottom of head
-	north: [24, 8, 32, 16],  // back of head
-	south: [8, 8, 16, 16],   // front (face, eyes)
-	west: [0, 8, 8, 16],     // right side
-	east: [16, 8, 24, 16]    // left side
-};
-
-// The dragon head lives in a non-humanoid 256x256 texture (16x16x16 head box at
-// texOffs(0,0)), so its UV regions differ from the standard humanoid layout.
-const DRAGON_HEAD_REGIONS = {
-	up: [16, 0, 32, 16],
-	down: [32, 0, 48, 16],
-	north: [48, 16, 64, 32],
-	south: [16, 16, 32, 32],
-	west: [0, 16, 16, 32],
-	east: [32, 16, 48, 32]
 };
 
 async function fetchJson(url) {
@@ -148,6 +139,8 @@ function detectSpecialModel(model) {
 					return { renderAs: 'chest', texture: String(inner.texture || 'normal') };
 				case 'minecraft:copper_golem_statue':
 					return { renderAs: 'golem_statue', texture: String(inner.texture || '') };
+				case 'minecraft:decorated_pot':
+					return { renderAs: 'decorated_pot' };
 				default:
 					return null;
 			}
@@ -438,38 +431,19 @@ function generatePotions(nameToId) {
 }
 
 /**
- * Extract every recipe type: crafting (shaped + shapeless) from minecraft-data,
- * plus smelting/blasting/smoking/campfire/stonecutting/smithing from the vanilla
- * recipe JSONs, plus hardcoded brewing recipes.
+ * Extract every recipe type from the vanilla recipe JSONs (26.3 assets):
+ * crafting (shaped + shapeless), smelting/blasting/smoking/campfire,
+ * stonecutting and smithing. Brewing recipes are merged in separately.
  * Returns { resultId: [recipe, ...] }.
  */
-async function extractAllRecipes(mcData) {
+async function extractAllRecipes(nameToId) {
 	const recipes = {};
-	const byName = mcData.itemsByName || {};
-	const nameToId = (n) => {
-		const it = byName[String(n).replace(/^minecraft:/, '')];
-		return it ? it.id : null;
-	};
 	const addRecipe = (resultId, recipe) => {
 		if (!resultId) return;
 		(recipes[resultId] = recipes[resultId] || []).push(recipe);
 	};
 
-	// 1. Crafting recipes (shaped + shapeless) from minecraft-data
-	for (const [key, list] of Object.entries(mcData.recipes || {})) {
-		const resultId = parseInt(key);
-		if (isNaN(resultId)) continue;
-		for (const r of list || []) {
-			if (!r || !r.result || r.result.id <= 0) continue;
-			if (r.inShape) {
-				addRecipe(resultId, { type: 'crafting_shaped', inShape: r.inShape, result: { id: r.result.id, count: r.result.count } });
-			} else if (r.ingredients) {
-				addRecipe(resultId, { type: 'crafting_shapeless', ingredients: r.ingredients, result: { id: r.result.id, count: r.result.count } });
-			}
-		}
-	}
-
-	// 2. Furnace-family, stonecutting and smithing recipes from vanilla JSONs.
+	// 1. Vanilla recipe JSONs (all types).
 	const tagCache = new Map();
 	async function resolveIngredient(ing) {
 		if (Array.isArray(ing)) {
@@ -540,15 +514,38 @@ async function extractAllRecipes(mcData) {
 					addition: addition == null ? null : addition,
 					result: { id: resultId, count: r.result.count || 1 }
 				});
+			} else if (type === 'crafting_shaped') {
+				const key = r.key || {};
+				const keyIds = {};
+				for (const [ch, ing] of Object.entries(key)) keyIds[ch] = await resolveIngredient(ing);
+				const inShape = (Array.isArray(r.pattern) ? r.pattern : []).map((row) =>
+					String(row).split('').map((ch) => (ch === ' ' ? null : (keyIds[ch] ?? null)))
+				);
+				if (inShape.length > 0) {
+					addRecipe(resultId, {
+						type: 'crafting_shaped',
+						inShape,
+						result: { id: resultId, count: r.result.count || 1 }
+					});
+				}
+			} else if (type === 'crafting_shapeless') {
+				const ingredients = [];
+				for (const ing of r.ingredients || []) ingredients.push(await resolveIngredient(ing));
+				if (ingredients.length > 0) {
+					addRecipe(resultId, {
+						type: 'crafting_shapeless',
+						ingredients,
+						result: { id: resultId, count: r.result.count || 1 }
+					});
+				}
 			}
-			// crafting_shaped / crafting_shapeless are skipped here (already covered
-			// by minecraft-data), as are other specialised types.
+			// Other specialised types (decorated pot, transmute, ...) are skipped.
 		}
 	};
 	const workers = new Array(Math.min(40, files.length)).fill(null).map(() => worker());
 	await Promise.all(workers);
 
-	// 3. Brewing recipes are generated separately by generatePotions() and merged
+	// 2. Brewing recipes are generated separately by generatePotions() and merged
 	// in extractData (every potion variant is its own item).
 
 	return recipes;
@@ -673,94 +670,6 @@ async function downloadSkin(remoteUrl, localPath) {
 }
 
 /**
- * Build a full bed block model (head + foot) referencing the given bed texture.
- * Geometry replicates the vanilla bed model (head board + frame + legs). UVs are
- * in 0-16 space mapping onto the 64x64 `entity/bed/{color}.png` atlas.
- */
-function buildBedModel(textureName) {
-	// Foot part elements (from vanilla template_bed_foot).
-	const foot = [
-		{
-			from: [0, 0, 0], to: [3, 3, 3],
-			faces: {
-				north: { uv: [12.5, 5.25, 13.25, 6], texture: '#bed' },
-				east: { uv: [14.75, 5.25, 15.5, 6], texture: '#bed' },
-				south: { uv: [14, 5.25, 14.75, 6], texture: '#bed' },
-				west: { uv: [13.25, 5.25, 14, 6], texture: '#bed' },
-				down: { uv: [14, 4.5, 14.75, 5.25], texture: '#bed' }
-			}
-		},
-		{
-			from: [13, 0, 0], to: [16, 3, 3],
-			faces: {
-				north: { uv: [14, 3.75, 13.25, 4.5], texture: '#bed' },
-				east: { uv: [12.5, 3.75, 13.25, 4.5], texture: '#bed' },
-				south: { uv: [14.75, 3.75, 15.5, 4.5], texture: '#bed' },
-				west: { uv: [14, 3.75, 14.75, 4.5], texture: '#bed' },
-				down: { uv: [14, 3, 14.75, 3.75], texture: '#bed' }
-			}
-		},
-		{
-			from: [0, 3, 0], to: [16, 9, 16],
-			faces: {
-				north: { uv: [5.5, 5.5, 9.5, 7], rotation: 180, texture: '#bed' },
-				east: { uv: [0, 7, 1.5, 11], rotation: 270, texture: '#bed' },
-				west: { uv: [5.5, 7, 7, 11], rotation: 90, texture: '#bed' },
-				up: { uv: [1.5, 7, 5.5, 11], rotation: 180, texture: '#bed' },
-				down: { uv: [7, 7, 11, 11], texture: '#bed' }
-			}
-		}
-	];
-
-	// Head part elements (from vanilla template_bed_head), offset +16 along Z so
-	// the head block sits next to the foot block.
-	const head = [
-		{
-			from: [0, 0, 13], to: [3, 3, 16],
-			faces: {
-				north: { uv: [14.75, 0.75, 15.5, 1.5], texture: '#bed' },
-				east: { uv: [14, 0.75, 14.75, 1.5], texture: '#bed' },
-				south: { uv: [13.25, 0.75, 14, 1.5], texture: '#bed' },
-				west: { uv: [12.5, 0.75, 13.25, 1.5], texture: '#bed' },
-				down: { uv: [14, 0, 14.75, 0.75], texture: '#bed' }
-			}
-		},
-		{
-			from: [13, 0, 13], to: [16, 3, 16],
-			faces: {
-				north: { uv: [14, 2.25, 14.75, 3], texture: '#bed' },
-				east: { uv: [13.25, 2.25, 14, 3], texture: '#bed' },
-				south: { uv: [12.5, 2.25, 13.25, 3], texture: '#bed' },
-				west: { uv: [14.75, 2.25, 15.5, 3], texture: '#bed' },
-				down: { uv: [14, 1.5, 14.75, 2.25], texture: '#bed' }
-			}
-		},
-		{
-			from: [0, 3, 0], to: [16, 9, 16],
-			faces: {
-				east: { uv: [0, 1.5, 1.5, 5.5], rotation: 270, texture: '#bed' },
-				south: { uv: [1.5, 0, 5.5, 1.5], rotation: 180, texture: '#bed' },
-				west: { uv: [5.5, 1.5, 7, 5.5], rotation: 90, texture: '#bed' },
-				up: { uv: [1.5, 1.5, 5.5, 5.5], rotation: 180, texture: '#bed' },
-				down: { uv: [7, 1.5, 11, 5.5], texture: '#bed' }
-			}
-		}
-	].map((el) => ({
-		from: [el.from[0], el.from[1], el.from[2] + 16],
-		to: [el.to[0], el.to[1], el.to[2] + 16],
-		faces: el.faces
-	}));
-
-	return {
-		textures: { bed: textureName },
-		display: {
-			gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] }
-		},
-		elements: [...foot, ...head]
-	};
-}
-
-/**
  * Download banner_base.png and split it into a tinted cloth texture and a brown
  * pole texture (both saved under /textures/block so the 3D banner model can use
  * them). The cloth is left of the first fully-transparent column, the pole is to
@@ -783,10 +692,11 @@ async function downloadBannerParts(color, hex) {
 
 	mkdirSync(dirname(clothPath), { recursive: true });
 
-	const tintCrop = (x0, x1, rgb) => {
+	const tintCrop = (x0, x1, rgb, yMax = h) => {
 		const cw = x1 - x0;
-		const out = Buffer.alloc(cw * h * 4);
-		for (let y = 0; y < h; y++) {
+		const ch = Math.min(h, yMax);
+		const out = Buffer.alloc(cw * ch * 4);
+		for (let y = 0; y < ch; y++) {
 			for (let x = 0; x < cw; x++) {
 				const si = (y * w + x0 + x) * 4;
 				const di = (y * cw + x) * 4;
@@ -796,11 +706,14 @@ async function downloadBannerParts(color, hex) {
 				out[di + 3] = data[si + 3];
 			}
 		}
-		return sharp(out, { raw: { width: cw, height: h, channels: 4 } });
+		return sharp(out, { raw: { width: cw, height: ch, channels: 4 } });
 	};
 
+	// The cloth crop stops before the brown stand strip at the bottom of the
+	// base sheet and before the transparent/noise columns right of the flag;
+	// keeping them painted dark bands across the flag face.
 	if (!existsSync(clothPath)) {
-		await tintCrop(0, split, cloth)
+		await tintCrop(0, split, cloth, 42)
 			.trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
 			.webp({ lossless: true, effort: 4 })
 			.toFile(clothPath);
@@ -814,121 +727,6 @@ async function downloadBannerParts(color, hex) {
 	}
 
 	return { cloth: `banner_cloth_${color}`, pole: 'banner_pole' };
-}
-
-/** Build a head block model JSON referencing the given skin texture name. */
-function buildHeadModel(skinName, { width, height }, regions = HEAD_REGIONS) {
-	const uv = {};
-	for (const [face, region] of Object.entries(regions)) {
-		uv[face] = [
-			region[0] * 16 / width,
-			region[1] * 16 / height,
-			region[2] * 16 / width,
-			region[3] * 16 / height
-		];
-	}
-	return {
-		textures: { skin: skinName },
-		display: {
-			gui: { rotation: [30, 45, 0], translation: [0, 3, 0], scale: [1, 1, 1] }
-		},
-		elements: [
-			{
-				from: [4, 0, 4],
-				to: [12, 8, 12],
-				faces: {
-					down: { uv: uv.down, texture: '#skin' },
-					up: { uv: uv.up, texture: '#skin' },
-					north: { uv: uv.north, texture: '#skin' },
-					south: { uv: uv.south, texture: '#skin' },
-					west: { uv: uv.west, texture: '#skin' },
-					east: { uv: uv.east, texture: '#skin' }
-				}
-			}
-		]
-	};
-}
-
-/**
- * Build a cuboid element whose faces all use the same texture. `uvMap` may be a
- * flat [u1,v1,u2,v2] array (applied to every face) or a per-face map
- * { north: [u1,v1,u2,v2], ... }.
- */
-function cuboid(from, to, texture, uvMap) {
-	const flat = Array.isArray(uvMap) ? uvMap : null;
-	const faces = {};
-	for (const f of ['down', 'up', 'north', 'south', 'west', 'east']) {
-		const uv = flat ? flat : (uvMap && Array.isArray(uvMap[f]) ? uvMap[f] : [0, 0, 16, 16]);
-		faces[f] = { uv, texture };
-	}
-	return { from, to, faces };
-}
-
-/**
- * Build a chest block model (body + lid + latch). The 26.1 chest texture
- * (entity/chest/*.png) is 64x64, so UV = pixel / 4. The latch sits on the south
- * face, which the [30,45,0] gui transform shows toward the camera.
- */
-function buildChestModel(textureName) {
-	const bodyFront = [3.5, 4.75, 10.5, 8];   // body front (14,19)-(42,32)
-	const lidFront = [3.5, 0, 10.5, 3.5];     // lid front (14,0)-(42,14)
-	const lidTop = [0, 3.5, 14, 4.5];         // lid top (0,14)-(56,18)
-	const top = [0, 8.25, 14, 10.75];         // body top/bottom (0,33)-(56,43)
-	const latch = [8.25, 5.25, 10.5, 7.5];    // latch (33,21)-(42,30)
-
-	return {
-		textures: { chest: textureName },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([0, 0, 0], [16, 10, 14], '#chest', { north: bodyFront, south: bodyFront, east: bodyFront, west: bodyFront, up: top, down: top }),
-			cuboid([0, 10, 0], [16, 14, 14], '#chest', { north: lidFront, south: lidFront, east: lidFront, west: lidFront, up: lidTop }),
-			cuboid([7, 10, 14], [9, 13, 15], '#chest', latch)
-		]
-	};
-}
-
-/**
- * Build a copper golem statue model (pedestal + body + head). The golem texture
- * (entity/copper_golem/copper_golem*.png) is 64x64, so UV = pixel / 4.
- */
-function buildGolemStatueModel(textureName) {
-	const head = [2.5, 0, 6.5, 2];  // head (10,0)-(26,8)
-	const body = [0, 2.5, 8, 4];    // body (0,10)-(32,16)
-	return {
-		textures: { golem: textureName },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([3, 0, 3], [13, 2, 13], '#golem', body),
-			cuboid([5, 2, 5], [11, 8, 11], '#golem', body),
-			cuboid([6, 8, 6], [10, 13, 10], '#golem', head)
-		]
-	};
-}
-
-/**
- * Build a shield model: a thin vertical slab carrying the (pre-rotated)
- * shield_base texture. The transparent background reveals the shield shape.
- */
-function buildShieldModel(textureName) {
-	return {
-		textures: { shield: textureName },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([5, 1, 7], [11, 15, 8], '#shield')
-		]
-	};
-}
-
-/** Build a banner model: a vertical pole with the tinted cloth hanging beside it. */
-function buildBannerModel(clothTexture, poleTexture) {
-	return {
-		textures: { cloth: clothTexture, pole: poleTexture },
-		display: { gui: { rotation: [30, 45, 0], translation: [0, 0, 0], scale: [0.625, 0.625, 0.625] } },
-		elements: [
-			cuboid([7, 0, 7], [9, 15, 9], '#pole'),
-			cuboid([2, 3, 8], [7, 13, 8.5], '#cloth')
-		]
-	};
 }
 
 function removeStalePngTextures() {
@@ -1020,50 +818,96 @@ async function downloadTextures(tasks) {
 	console.log(`Downloaded ${downloaded}/${unique.length} textures`);
 }
 
+/**
+ * Write a data file atomically: remove any previous file first (Windows
+ * truncation quirks left stale tails when overwriting longer files with
+ * shorter content) and verify the written bytes parse back.
+ */
+function writeJsonFile(path, data) {
+	const json = JSON.stringify(data);
+	if (existsSync(path)) unlinkSync(path);
+	writeFileSync(path, json);
+	try {
+		JSON.parse(readFileSync(path, 'utf8'));
+	} catch (error) {
+		throw new Error(`Corrupt write detected for ${path}: ${error.message}`);
+	}
+}
+
 async function extractData() {
 	console.time('extractData');
 
-	// Use Java 26.1 - matches texture version
-	let mcData = minecraftData('26.1');
-	if (!mcData) throw new Error('Could not load Minecraft data for 26.1');
+	// Catalog source of truth: the 26.3 assets repo. items/_all.json lists every
+	// item with its model dispatch; an item is a "block item" when its resolved
+	// model path lives under minecraft:block/.
+	// minecraft-data (only published up to 26.1) is used solely as a fallback
+	// for display names and stack sizes by name.
+	const labelData = minecraftData('26.1');
+	if (!labelData) throw new Error('Could not load minecraft-data 26.1 for display names/stack sizes');
 
-	const blockNames = new Set(
-		(mcData.blocksArray || []).map((b) => b.name).filter((n) => n && n !== 'air')
-	);
+	const itemDispatch = await fetchJson(`${ITEMS_BASE}/_all.json`);
+	if (!itemDispatch) throw new Error(`Could not load item catalog from ${ITEMS_BASE}/_all.json`);
 
-	const allItems = (mcData.itemsArray || [])
-		.map((item) => {
-			const isBlockItem = blockNames.has(item.name);
-			const cleanName = item.name.replace('minecraft:', '');
-			const textureUrl = isBlockItem
-				? `${BLOCKS_TEXTURE_BASE}/${cleanName}.png`
-				: `${ITEMS_TEXTURE_BASE}/${cleanName}.png`;
-			return {
-				id: item.id,
-				name: item.name,
-				displayName: item.displayName,
-				stackSize: item.stackSize || 64,
-				textureUrl
-			};
-		})
-		.filter((item) => item.id > 0 && item.name !== 'air');
+	// Keep existing numeric ids stable (recipes.json keys and client code
+	// reference them); new 26.3 items get ids appended after the current max.
+	const existingIds = new Map();
+	try {
+		const prev = JSON.parse(readFileSync(join(dataDir, 'items.json'), 'utf8'));
+		for (const item of prev) {
+			if (item && typeof item.name === 'string' && Number.isFinite(item.id)) {
+				existingIds.set(item.name.replace(/^minecraft:/, ''), item.id);
+			}
+		}
+	} catch {
+		// No previous extraction: every id is assigned from scratch.
+	}
+	let nextId = Math.max(0, ...[...existingIds.values()].filter((id) => id < POTION_ID_BASE)) + 1;
 
-	const blockItemIds = new Set(allItems.filter((item) => blockNames.has(item.name)).map((item) => item.id));
+	// `air` is not an item; the assets catalog still lists it.
+	const catalog = new Map(); // name -> { id, blockItem }
+	for (const [name, dispatch] of Object.entries(itemDispatch)) {
+		if (!name || name.startsWith('_') || name === 'air') continue;
+		const modelPath = resolveItemModelRef(dispatch?.model);
+		const blockItem = modelPath?.startsWith('minecraft:block/') ?? false;
+		const id = existingIds.get(name) ?? nextId++;
+		catalog.set(name, { id, blockItem });
+	}
+
+	const displayNameOf = (name) =>
+		labelData.itemsByName?.[name]?.displayName ??
+		name.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+	const allItems = [...catalog.entries()]
+		.map(([name, meta]) => ({
+			id: meta.id,
+			// Bare item name (no "minecraft:" prefix) — the format every
+			// consumer of items.json expects (recipes, bedrock-ids, the API).
+			name,
+			displayName: displayNameOf(name),
+			stackSize: labelData.itemsByName?.[name]?.stackSize || 64,
+			textureUrl: meta.blockItem
+				? `${BLOCKS_TEXTURE_BASE}/${name}.png`
+				: `${ITEMS_TEXTURE_BASE}/${name}.png`
+		}))
+		.sort((a, b) => a.id - b.id);
+
+	const blockItemIds = new Set([...catalog.values()].filter((m) => m.blockItem).map((m) => m.id));
 
 	// Generate every potion as its own item (normal/splash/lingering × I/II/
 	// extended) with a full brewing step chain each. The generic potion carriers
 	// (potion / splash_potion / lingering_potion) are removed so brewing no longer
 	// shows up as recipes of a single "potion" item.
 	const nameToId = (n) => {
-		const it = mcData.itemsByName[String(n).replace(/^minecraft:/, '')];
-		return it ? it.id : null;
+		const meta = catalog.get(String(n).replace(/^minecraft:/, ''));
+		return meta ? meta.id : null;
 	};
 	const genericPotionNames = new Set(['potion', 'splash_potion', 'lingering_potion']);
 	const vanillaItems = allItems.filter((item) => !genericPotionNames.has(item.name.replace('minecraft:', '')));
 	const potionGen = generatePotions(nameToId);
 
-	// Extract recipes (crafting + smelting/blasting/smoking/campfire/stonecutting/smithing)
-	const recipes = await extractAllRecipes(mcData);
+	// Extract recipes (crafting shaped/shapeless + smelting/blasting/smoking/
+	// campfire/stonecutting/smithing) from the vanilla recipe JSONs.
+	const recipes = await extractAllRecipes(nameToId);
 	for (const [id, list] of Object.entries(potionGen.recipes)) {
 		(recipes[id] = recipes[id] || []).push(...list);
 	}
@@ -1159,6 +1003,17 @@ async function extractData() {
 		info.textures = [{ namespace: 'block', name: parts.cloth }, { namespace: 'block', name: parts.pole }];
 	}
 
+	// Convert `minecraft:decorated_pot` specials into a generated 3D vase model.
+	// The vanilla block model only carries a particle texture and terracotta is
+	// already downloaded for the standard blocks, so no texture work is needed.
+	for (const info of resolved.values()) {
+		if (info.renderAs !== 'decorated_pot') continue;
+		writeFileSync(join(headsDir, 'decorated_pot.json'), JSON.stringify(buildDecoratedPotModel()));
+		info.renderAs = 'block';
+		info.modelName = 'decorated_pot';
+		info.textures = [{ namespace: 'block', name: 'terracotta' }];
+	}
+
 	// Collect block model names + texture download tasks.
 	const blockModelNames = new Set();
 	const textureTasks = [];
@@ -1213,7 +1068,7 @@ async function extractData() {
 			if (!f.endsWith('.json')) continue;
 			allModels[f.slice(0, -5)] = JSON.parse(readFileSync(join(blockModelsDir, f), 'utf8'));
 		}
-		writeFileSync(join(dataDir, 'models', 'all.json'), JSON.stringify(allModels));
+		writeJsonFile(join(dataDir, 'models', 'all.json'), allModels);
 		console.log(`Combined ${Object.keys(allModels).length} block models into all.json`);
 	}
 
@@ -1261,21 +1116,21 @@ async function extractData() {
 	// Append the generated potion items (already carry their textureUrl/layers).
 	itemsWithData.push(...potionGen.items);
 
-	const allBlocks = (mcData.blocksArray || [])
+	const allBlocks = vanillaItems
+		.filter((item) => blockItemIds.has(item.id))
 		.map((block) => ({
 			id: block.id,
 			name: block.name,
-			displayName: block.displayName || block.name,
+			displayName: block.displayName,
 			stackSize: 64,
 			textureUrl: `/textures/block/${block.name.replace('minecraft:', '')}.webp`
-		}))
-		.filter((block) => block.id > 0 && block.name !== 'air');
+		}));
 
 	mkdirSync(dataDir, { recursive: true });
-	writeFileSync(join(dataDir, 'items.json'), JSON.stringify(itemsWithData));
-	writeFileSync(join(dataDir, 'blocks.json'), JSON.stringify(allBlocks));
-	writeFileSync(join(dataDir, 'recipes.json'), JSON.stringify(recipes));
-	writeFileSync(join(dataDir, 'block-item-ids.json'), JSON.stringify([...blockItemIds]));
+	writeJsonFile(join(dataDir, 'items.json'), itemsWithData);
+	writeJsonFile(join(dataDir, 'blocks.json'), allBlocks);
+	writeJsonFile(join(dataDir, 'recipes.json'), recipes);
+	writeJsonFile(join(dataDir, 'block-item-ids.json'), [...blockItemIds]);
 
 	console.log(`Extracted ${itemsWithData.length} items (${blockItemIds.size} block items, ${itemsWithData.length - blockItemIds.size} pure items)`);
 	console.log(`Extracted ${allBlocks.length} blocks`);
